@@ -54,10 +54,14 @@ const MISSING_RETURNS = 'Convex function is missing a `returns` validator.';
  * `export default query(...)`, and locals exported later through
  * `export default name`, `export const other = name`, or
  * `export { name, name as other }`. Registrars imported under an alias
- * (`import { query as q }`) are recognized. Registrars reached through a
- * custom wrapper (`customQuery(...)`) are outside this check. The options
- * must be an inline object literal; any other first argument (a handler
- * callback, a variable) reports both validators as missing.
+ * (`import { query as q }`) or through a namespace (`server.query`) are
+ * recognized, also when wrapped in parentheses, `as`, `satisfies` or `!`.
+ * The check is name-based: any module that exports a `query` (for example a
+ * convex-helpers `customQuery` builder, which passes `args` and `returns`
+ * through) is held to the same rule. Builders under other names
+ * (`authedQuery(...)`) are outside this check. The options must be an inline
+ * object literal; any other first argument (a handler callback, a variable)
+ * reports both validators as missing.
  *
  * @param {{ relativePath: string; contents: string }} params Path and file text
  * @returns {{ findings: ValidatorFinding[] }}
@@ -79,7 +83,7 @@ export function scanConvexValidators({ relativePath, contents }) {
     SCRIPT_KIND_BY_EXTENSION.get(extname(normalized)) ?? ts.ScriptKind.TS,
   );
 
-  const { registrarNames } = getRegistrarNames({ sourceFile });
+  const { registrars } = getRegistrars({ sourceFile });
 
   /**
    * Top-level `name = <registrar>(...)` declarations, exported or not, plus
@@ -97,11 +101,12 @@ export function scanConvexValidators({ relativePath, contents }) {
       if (!initializer || !ts.isIdentifier(declaration.name)) {
         continue;
       }
-      if (isRegistrarCall({ expression: initializer, registrarNames })) {
-        localRegistrars.set(declaration.name.text, {
-          call: initializer,
-          node: statement,
-        });
+      const { call } = getRegistrarCall({
+        expression: initializer,
+        registrars,
+      });
+      if (call) {
+        localRegistrars.set(declaration.name.text, { call, node: statement });
       } else if (ts.isIdentifier(initializer)) {
         const aliased = localRegistrars.get(initializer.text);
         if (aliased) {
@@ -147,16 +152,21 @@ export function scanConvexValidators({ relativePath, contents }) {
         if (!initializer) {
           continue;
         }
-        if (isRegistrarCall({ expression: initializer, registrarNames })) {
-          check({ call: initializer, node: statement });
+        const { call } = getRegistrarCall({
+          expression: initializer,
+          registrars,
+        });
+        if (call) {
+          check({ call, node: statement });
         } else if (ts.isIdentifier(initializer)) {
           checkLocal(initializer.text);
         }
       }
     } else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
       const { expression } = statement;
-      if (isRegistrarCall({ expression, registrarNames })) {
-        check({ call: expression, node: statement });
+      const { call } = getRegistrarCall({ expression, registrars });
+      if (call) {
+        check({ call, node: statement });
       } else if (ts.isIdentifier(expression)) {
         checkLocal(expression.text);
       }
@@ -193,44 +203,79 @@ function isExported(statement) {
 }
 
 /**
- * Local names that refer to a Convex registrar in this file: the canonical
- * names plus any alias from a named import (`import { query as q }`).
+ * @typedef {{ names: Set<string>; namespaces: Set<string> }} Registrars
+ *   `names`: local identifiers that are a registrar (canonical names plus
+ *   aliases from `import { query as q }`). `namespaces`: locals bound by
+ *   `import * as server`, so `server.query(...)` is a registrar call.
+ */
+
+/**
+ * Collect how this file can spell a Convex registrar.
  *
  * @param {{ sourceFile: import('typescript').SourceFile }} params Parsed file
- * @returns {{ registrarNames: Set<string> }}
+ * @returns {{ registrars: Registrars }}
  */
-function getRegistrarNames({ sourceFile }) {
-  const registrarNames = new Set(REGISTRAR_NAMES);
+function getRegistrars({ sourceFile }) {
+  /** @type {Registrars} */
+  const registrars = { names: new Set(REGISTRAR_NAMES), namespaces: new Set() };
   for (const statement of sourceFile.statements) {
     const bindings = ts.isImportDeclaration(statement)
       ? statement.importClause?.namedBindings
       : undefined;
-    if (!bindings || !ts.isNamedImports(bindings)) {
+    if (!bindings) {
+      continue;
+    }
+    if (ts.isNamespaceImport(bindings)) {
+      registrars.namespaces.add(bindings.name.text);
       continue;
     }
     for (const element of bindings.elements) {
       const imported = (element.propertyName ?? element.name).text;
       if (REGISTRAR_NAMES.has(imported)) {
-        registrarNames.add(element.name.text);
+        registrars.names.add(element.name.text);
       }
     }
   }
-  return { registrarNames };
+  return { registrars };
 }
 
 /**
- * Whether an expression is a call to a Convex registrar such as `query(...)`.
+ * Return the registrar call inside an expression, looking through
+ * transparent wrappers: parentheses, `as`, `satisfies`, `<T>` assertions and
+ * non-null `!`. Accepts `query(...)`, an aliased `q(...)`, and a namespace
+ * member `server.query(...)`.
  *
- * @param {{ expression: import('typescript').Expression; registrarNames: Set<string> }} params
- *   Candidate expression and the registrar names valid in its file
- * @returns {expression is import('typescript').CallExpression}
+ * @param {{ expression: import('typescript').Expression; registrars: Registrars }} params
+ *   Candidate expression and the registrar spellings valid in its file
+ * @returns {{ call: import('typescript').CallExpression | undefined }}
  */
-function isRegistrarCall({ expression, registrarNames }) {
-  return (
-    ts.isCallExpression(expression) &&
-    ts.isIdentifier(expression.expression) &&
-    registrarNames.has(expression.expression.text)
-  );
+function getRegistrarCall({ expression, registrars }) {
+  let inner = expression;
+  while (
+    ts.isParenthesizedExpression(inner) ||
+    ts.isAsExpression(inner) ||
+    ts.isSatisfiesExpression(inner) ||
+    ts.isTypeAssertionExpression(inner) ||
+    ts.isNonNullExpression(inner)
+  ) {
+    inner = inner.expression;
+  }
+  if (!ts.isCallExpression(inner)) {
+    return { call: undefined };
+  }
+  const callee = inner.expression;
+  if (ts.isIdentifier(callee) && registrars.names.has(callee.text)) {
+    return { call: inner };
+  }
+  if (
+    ts.isPropertyAccessExpression(callee) &&
+    ts.isIdentifier(callee.expression) &&
+    registrars.namespaces.has(callee.expression.text) &&
+    REGISTRAR_NAMES.has(callee.name.text)
+  ) {
+    return { call: inner };
+  }
+  return { call: undefined };
 }
 
 /**

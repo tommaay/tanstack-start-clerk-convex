@@ -269,6 +269,69 @@ export const list = query({
     expect(result).toEqual({ args: true, returns: false, lines: [3] });
   });
 
+  it.each([
+    [
+      'as',
+      'export const list = query({ handler: async () => null }) as any;\n',
+    ],
+    [
+      'satisfies',
+      'export const list = query({ handler: async () => null }) satisfies unknown;\n',
+    ],
+    [
+      'non-null',
+      'export const list = query({ handler: async () => null })!;\n',
+    ],
+    [
+      'parentheses',
+      'export const list = ((query({ handler: async () => null })));\n',
+    ],
+    [
+      'angle-bracket assertion',
+      'export const list = <any>query({ handler: async () => null });\n',
+    ],
+  ])(
+    'looks through a %s wrapper around the registrar call',
+    (_label, contents) => {
+      const result = flagsFor(contents);
+      expect(result).toEqual({ args: true, returns: true, lines: [1, 1] });
+    },
+  );
+
+  it('passes a wrapped registrar call that carries both validators', () => {
+    const result = flagsFor(`export const list = query({
+  args: {},
+  returns: v.null(),
+  handler: async () => null,
+}) as unknown;
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
+  it('flags a registrar called through a namespace import', () => {
+    const result = flagsFor(`import * as server from './_generated/server';
+
+export const list = server.query({ handler: async () => null });
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [3, 3] });
+  });
+
+  it('passes a namespace registrar call that carries both validators', () => {
+    const result = flagsFor(`import * as server from './_generated/server';
+
+export const list = server.query({ args: {}, returns: v.null(), handler: async () => null });
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
+  it('ignores a member call on an object that is not a namespace import', () => {
+    const result = flagsFor(`const helpers = { query: () => null };
+
+export const list = helpers.query({ handler: async () => null });
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
   it('reports a registrar once when it is exported twice', () => {
     const result =
       flagsFor(`export const list = query({ handler: async () => null });
