@@ -9,12 +9,27 @@
  * Source: https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
  */
 import { readdir, readFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, extname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set(['_generated', 'node_modules']);
+/**
+ * Extensions the Convex CLI bundles as function modules, mapped to the parser
+ * flavor TypeScript needs. Source: `ENTRY_POINT_EXTENSIONS` in
+ * `convex/dist/cli.bundle.cjs`.
+ */
+const SCRIPT_KIND_BY_EXTENSION = new Map([
+  ['.ts', ts.ScriptKind.TS],
+  ['.mts', ts.ScriptKind.TS],
+  ['.cts', ts.ScriptKind.TS],
+  ['.tsx', ts.ScriptKind.TSX],
+  ['.js', ts.ScriptKind.JS],
+  ['.mjs', ts.ScriptKind.JS],
+  ['.cjs', ts.ScriptKind.JS],
+  ['.jsx', ts.ScriptKind.JSX],
+]);
 const REGISTRAR_NAMES = new Set([
   'query',
   'mutation',
@@ -54,7 +69,7 @@ export function scanConvexValidators({ relativePath, contents }) {
     contents,
     ts.ScriptTarget.Latest,
     true,
-    ts.ScriptKind.TS,
+    SCRIPT_KIND_BY_EXTENSION.get(extname(normalized)) ?? ts.ScriptKind.TS,
   );
 
   for (const statement of sourceFile.statements) {
@@ -174,7 +189,10 @@ export async function scanConvexDirectory({ root }) {
         continue;
       }
 
-      if (!entry.isFile() || !entry.name.endsWith('.ts')) {
+      if (
+        !entry.isFile() ||
+        !SCRIPT_KIND_BY_EXTENSION.has(extname(entry.name))
+      ) {
         continue;
       }
 

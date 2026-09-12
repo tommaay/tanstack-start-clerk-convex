@@ -1,8 +1,23 @@
 /**
  * Tests for Convex validator scans (args + returns on registered functions).
  */
-import { describe, expect, it } from 'vitest';
-import { scanConvexValidators } from './check-convex-returns.mjs';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+  scanConvexDirectory,
+  scanConvexValidators,
+} from './check-convex-returns.mjs';
+
+/** @type {string[]} */
+const tempDirs = [];
+
+afterEach(async () => {
+  await Promise.all(
+    tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })),
+  );
+});
 
 /**
  * Scan a snippet and report which validators it flags.
@@ -179,11 +194,55 @@ export const value = compute({ handler: 1 });
     expect(findings).toEqual([]);
   });
 
+  it.each([
+    [
+      'convex/legacy.js',
+      'export const list = query({ handler: async () => null });\n',
+    ],
+    [
+      'convex/legacy.mjs',
+      'export const list = mutation({ handler: async () => null });\n',
+    ],
+    [
+      'convex/widget.tsx',
+      'export const list = action({ handler: async () => <div /> });\n',
+    ],
+  ])('scans %s like the Convex bundler does', (relativePath, contents) => {
+    const { findings } = scanConvexValidators({ relativePath, contents });
+    expect(findings.map((finding) => finding.message)).toEqual([
+      'Convex function is missing an `args` validator.',
+      'Convex function is missing a `returns` validator.',
+    ]);
+  });
+
   it('skips generated files', () => {
     const { findings } = scanConvexValidators({
       relativePath: 'convex/_generated/api.ts',
       contents: 'export const list = query({ handler: async () => null });\n',
     });
     expect(findings).toEqual([]);
+  });
+});
+
+describe('scanConvexDirectory', () => {
+  it('walks every Convex module extension and skips _generated', async () => {
+    const root = await mkdtemp(join(tmpdir(), 'convex-returns-'));
+    tempDirs.push(root);
+    const convexDir = join(root, 'convex');
+    await mkdir(join(convexDir, '_generated'), { recursive: true });
+    await mkdir(join(convexDir, 'nested'));
+    const missing =
+      'export const list = query({ handler: async () => null });\n';
+    await writeFile(join(convexDir, 'a.ts'), missing, 'utf8');
+    await writeFile(join(convexDir, 'b.js'), missing, 'utf8');
+    await writeFile(join(convexDir, 'nested', 'c.mjs'), missing, 'utf8');
+    await writeFile(join(convexDir, '_generated', 'd.js'), missing, 'utf8');
+    await writeFile(join(convexDir, 'notes.md'), missing, 'utf8');
+
+    const { findings } = await scanConvexDirectory({ root });
+
+    expect(
+      [...new Set(findings.map((finding) => finding.file))].sort(),
+    ).toEqual(['convex/a.ts', 'convex/b.js', 'convex/nested/c.mjs']);
   });
 });
