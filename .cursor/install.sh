@@ -91,6 +91,11 @@ if "${CURL_PROBE[@]}" -o /dev/null http://127.0.0.1:3210/version; then
     exit 1
   fi
   echo "Convex local backend '$running' already running on port 3210; skipping deploy."
+  # A first run without the secret stored the placeholder issuer. Push the
+  # real value when it is available now; never overwrite with the placeholder.
+  if [ -n "${CLERK_JWT_ISSUER_DOMAIN:-}" ]; then
+    CONVEX_AGENT_MODE=anonymous pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN "$CLERK_JWT_ISSUER_DOMAIN"
+  fi
 else
   # Recipe from `npx convex init --help`: `init` writes .env.local without a
   # push, so `env set` has a deployment to target. `convex/auth.config.ts`
