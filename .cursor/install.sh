@@ -30,10 +30,15 @@ if [ ! -f .env ]; then
   if [ -z "${CLERK_PUBLISHABLE_KEY:-}" ] || [ -z "${CLERK_SECRET_KEY:-}" ]; then
     echo "WARNING: CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY are not set. The app will return 500 until you add them (Cursor Secrets or .env)." >&2
   fi
-  cat > .env <<EOF
+  # Owner-only mode: the file holds CLERK_SECRET_KEY. The subshell keeps the
+  # restrictive umask from leaking into later steps.
+  (
+    umask 077
+    cat > .env <<EOF
 CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY:-}
 CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
 EOF
+  )
 fi
 
 # 3. Anonymous local Convex deployment.
