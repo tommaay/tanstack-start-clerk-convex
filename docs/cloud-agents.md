@@ -38,7 +38,9 @@ Cursor Secrets (cloud agents) / repository secrets (GitHub Actions):
 
 1. `.cursor/install.sh` — `pnpm install --ignore-scripts`, writes `.env` with
    the Clerk keys, sets `CLERK_JWT_ISSUER_DOMAIN` on the anonymous deployment,
-   runs `convex dev --once` (skipped when :3210 already answers).
+   runs `convex dev --once` (skipped when :3210 already answers and
+   `.env.local` exists; a busy port without `.env.local` is an error, because
+   another project's backend owns the port).
 2. Terminals — `convex` (anonymous watcher) and `vite` (`pnpm dev:web`).
 3. Agent runs `pnpm check` before opening a PR. Without
    `E2E_CLERK_USER_EMAIL` the signed-in project is skipped; say so in the PR.

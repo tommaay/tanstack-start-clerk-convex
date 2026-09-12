@@ -51,9 +51,13 @@ ensure_env_key() {
 }
 
 # Owner-only mode: the file holds CLERK_SECRET_KEY. The subshell keeps the
-# restrictive umask from leaking into later steps.
+# restrictive umask from leaking into later steps. umask only shapes new
+# files, so an existing hand-made `.env` (often 0644) is tightened first.
 (
   umask 077
+  if [ -f .env ]; then
+    chmod 600 .env
+  fi
   ensure_env_key CLERK_PUBLISHABLE_KEY "${CLERK_PUBLISHABLE_KEY:-}"
   ensure_env_key CLERK_SECRET_KEY "${CLERK_SECRET_KEY:-}"
 )
@@ -62,10 +66,16 @@ if [ -z "$(env_file_value CLERK_PUBLISHABLE_KEY)" ] || [ -z "$(env_file_value CL
 fi
 
 # 3. Anonymous local Convex deployment.
-#    Skip when a backend already serves :3210 (the `convex` terminal is up on a
-#    re-run): `convex dev --once` refuses to start a second backend there, and a
-#    running backend means `.env.local` and generated types already exist.
+#    Skip when a backend already serves :3210 AND this checkout has its
+#    `.env.local` (the `convex` terminal is up on a re-run). A busy port with
+#    no `.env.local` means another project's backend owns :3210; `convex dev
+#    --once` cannot start a second backend there, so stop with a clear error
+#    instead of leaving Vite without VITE_CONVEX_URL.
 if curl -sf -o /dev/null http://127.0.0.1:3210/version; then
+  if [ ! -f .env.local ]; then
+    echo "ERROR: port 3210 already serves a Convex backend, but this checkout has no .env.local. Stop that backend (another project?) and re-run this script." >&2
+    exit 1
+  fi
   echo "Convex local backend already running on port 3210; skipping deploy."
 else
   # Recipe from `npx convex init --help`: `init` writes .env.local without a
