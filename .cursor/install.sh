@@ -66,17 +66,27 @@ if [ -z "$(env_file_value CLERK_PUBLISHABLE_KEY)" ] || [ -z "$(env_file_value CL
 fi
 
 # 3. Anonymous local Convex deployment.
-#    Skip when a backend already serves :3210 AND this checkout has its
-#    `.env.local` (the `convex` terminal is up on a re-run). A busy port with
-#    no `.env.local` means another project's backend owns :3210; `convex dev
-#    --once` cannot start a second backend there, so stop with a clear error
-#    instead of leaving Vite without VITE_CONVEX_URL.
+#    Skip when a backend already serves :3210 AND it is the deployment this
+#    checkout's `.env.local` names (the `convex` terminal is up on a re-run).
+#    The check mirrors the Convex CLI: `GET /instance_name` must equal the
+#    deployment name (`ensureBackendRunning` in convex/dist/cli.bundle.cjs).
+#    `.env.local` holds `CONVEX_DEPLOYMENT=anonymous:<name>`; the part after
+#    the last `:` is that name. Any other backend on :3210 is an error, since
+#    `convex dev --once` cannot start a second one there and Vite would point
+#    at a foreign deployment. Limit: every CONVEX_AGENT_MODE=anonymous checkout
+#    is named `anonymous-agent` by the CLI, so two agent-mode checkouts on one
+#    machine cannot be told apart here (nor by the CLI).
 if curl -sf -o /dev/null http://127.0.0.1:3210/version; then
-  if [ ! -f .env.local ]; then
-    echo "ERROR: port 3210 already serves a Convex backend, but this checkout has no .env.local. Stop that backend (another project?) and re-run this script." >&2
+  expected=""
+  if [ -f .env.local ]; then
+    expected="$(awk -F'[=:]' '/^CONVEX_DEPLOYMENT=/ { print $NF; exit }' .env.local)"
+  fi
+  running="$(curl -sf http://127.0.0.1:3210/instance_name || true)"
+  if [ -z "$expected" ] || [ "$running" != "$expected" ]; then
+    echo "ERROR: port 3210 serves Convex backend '${running:-unknown}', but this checkout expects '${expected:-none (no CONVEX_DEPLOYMENT in .env.local)}'. Stop that backend and re-run this script." >&2
     exit 1
   fi
-  echo "Convex local backend already running on port 3210; skipping deploy."
+  echo "Convex local backend '$running' already running on port 3210; skipping deploy."
 else
   # Recipe from `npx convex init --help`: `init` writes .env.local without a
   # push, so `env set` has a deployment to target. `convex/auth.config.ts`
