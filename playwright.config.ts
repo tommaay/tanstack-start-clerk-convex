@@ -25,7 +25,11 @@ import { existsSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 import { AUTH_FILE } from './e2e/constants';
 
-for (const file of ['.env', '.env.local']) {
+// Node's .env loader keeps a variable that is already set (documented for
+// `--env-file`: https://nodejs.org/api/cli.html#--env-fileconfig; verified for
+// `process.loadEnvFile` on Node 24). Load order = precedence: shell/CI, then
+// `.env.local`, then `.env`.
+for (const file of ['.env.local', '.env']) {
   if (existsSync(file)) {
     process.loadEnvFile(file);
   }
