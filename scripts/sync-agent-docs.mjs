@@ -209,7 +209,9 @@ async function removeStaleGeneratedSibling({ dir, names, fileName }) {
   ) {
     return;
   }
-  if (fileName === CLAUDE_NAME && !contents.startsWith('@AGENTS.md')) {
+  // A hand-written CLAUDE.md may also start with `@AGENTS.md`; only the full
+  // generated preamble marks a file this script owns.
+  if (fileName === CLAUDE_NAME && !contents.startsWith(CLAUDE_BODY)) {
     return;
   }
 

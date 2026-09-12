@@ -179,4 +179,44 @@ describe('syncAgentDocs', () => {
     expect(nestedAgents).toContain('# Feature');
     expect(nestedAgents).not.toContain('convex-ai-start');
   });
+
+  it('removes generated siblings but keeps hand-written ones when INSTRUCTIONS.md is gone', async () => {
+    const root = await makeTempRoot();
+    await writeFile(join(root, 'INSTRUCTIONS.md'), '# Root\n', 'utf8');
+    const generated = join(root, 'generated');
+    await mkdir(generated);
+    await writeFile(
+      join(generated, 'AGENTS.md'),
+      '# Generated from INSTRUCTIONS.md. Do not edit. Run pnpm agents:sync\n\n# Old\n',
+      'utf8',
+    );
+    await writeFile(
+      join(generated, 'CLAUDE.md'),
+      '@AGENTS.md\n\n`AGENTS.md` is generated. Do not edit it.\n',
+      'utf8',
+    );
+    const handWritten = join(root, 'hand-written');
+    await mkdir(handWritten);
+    await writeFile(join(handWritten, 'AGENTS.md'), '# Mine\n', 'utf8');
+    await writeFile(
+      join(handWritten, 'CLAUDE.md'),
+      '@AGENTS.md\n\nExtra notes for Claude that I maintain by hand.\n',
+      'utf8',
+    );
+
+    await syncAgentDocs({ root });
+
+    await expect(
+      readFile(join(generated, 'AGENTS.md'), 'utf8'),
+    ).rejects.toThrow();
+    await expect(
+      readFile(join(generated, 'CLAUDE.md'), 'utf8'),
+    ).rejects.toThrow();
+    expect(await readFile(join(handWritten, 'AGENTS.md'), 'utf8')).toBe(
+      '# Mine\n',
+    );
+    expect(await readFile(join(handWritten, 'CLAUDE.md'), 'utf8')).toContain(
+      'Extra notes for Claude',
+    );
+  });
 });
