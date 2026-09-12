@@ -1,0 +1,22 @@
+{
+  "name": "TanStack Start + Clerk + Convex starter",
+  "install": "./.cursor/install.sh",
+  "terminals": [
+    {
+      "name": "convex",
+      "command": "CONVEX_AGENT_MODE=anonymous pnpm exec convex dev",
+      "description": "Anonymous local Convex backend (port 3210) + function/type watcher. Keep running while developing."
+    },
+    {
+      "name": "vite",
+      "command": "pnpm dev:web",
+      "description": "TanStack Start dev server on http://localhost:3000. Reads the Convex URL from .env.local written during install and Clerk keys from .env."
+    }
+  ],
+  "ports": [
+    {
+      "name": "app",
+      "port": 3000
+    }
+  ]
+}
