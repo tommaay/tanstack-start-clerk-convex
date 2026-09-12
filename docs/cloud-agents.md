@@ -14,10 +14,12 @@ without touching your personal Convex dev deployment.
 - `convex dev --once` deploys and **stops** the backend. Keep a `convex dev`
   watcher running for the app (the `convex` terminal in
   `.cursor/environment.json`; Playwright starts one itself in CI).
-- The anonymous deployment starts with **no environment variables**.
-  `convex/auth.config.ts` needs `CLERK_JWT_ISSUER_DOMAIN`, so run
-  `CONVEX_AGENT_MODE=anonymous pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN <issuer>`
-  before the first `convex dev --once`. `env set` works before the first deploy.
+- The anonymous deployment starts with **no environment variables**, and
+  `env set` needs a configured deployment. Use the order from
+  `npx convex init --help`, all with `CONVEX_AGENT_MODE=anonymous`:
+  `convex init` (writes `.env.local`, no push) →
+  `convex env set CLERK_JWT_ISSUER_DOMAIN <issuer>` → `convex dev --once`.
+  `convex/auth.config.ts` fails the push when the variable is missing.
 - Never run `npx convex deploy` from an agent session. Production deploys are
   human-only.
 

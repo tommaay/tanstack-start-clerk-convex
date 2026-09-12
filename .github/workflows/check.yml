@@ -50,9 +50,12 @@ jobs:
         with:
           path: ~/.cache/convex
           key: convex-local-backend-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      # `convex/auth.config.ts` reads this deployment variable at push time.
-      - name: Set CLERK_JWT_ISSUER_DOMAIN on the anonymous Convex deployment
-        run: pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN "${CLERK_JWT_ISSUER_DOMAIN:-https://placeholder.clerk.accounts.dev}"
+      # Recipe from `npx convex init --help`: init (writes .env.local, no push)
+      # → env set → dev. `convex/auth.config.ts` reads the variable at push time.
+      - name: Configure the anonymous Convex deployment
+        run: |
+          pnpm exec convex init
+          pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN "${CLERK_JWT_ISSUER_DOMAIN:-https://placeholder.clerk.accounts.dev}"
         env:
           CLERK_JWT_ISSUER_DOMAIN: ${{ secrets.CLERK_JWT_ISSUER_DOMAIN }}
       - run: pnpm check:core

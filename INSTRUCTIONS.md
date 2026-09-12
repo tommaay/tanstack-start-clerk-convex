@@ -52,7 +52,7 @@ Full-stack React starter: **TanStack Start** (SSR, file routes, Vite 8) + **Cler
 Rules: [docs/cloud-agents.md](docs/cloud-agents.md).
 
 - `CONVEX_AGENT_MODE=anonymous` is for **cloud agents and CI only** — never for your normal local `convex dev`
-- Anonymous deployments start empty: run `convex env set CLERK_JWT_ISSUER_DOMAIN …` before the first `convex dev --once` (see `.cursor/install.sh`)
+- Anonymous deployments start empty: run `convex init`, then `convex env set CLERK_JWT_ISSUER_DOMAIN …`, then the first `convex dev --once` (see `.cursor/install.sh`)
 - Never run `npx convex deploy` from an agent session (production deploy is human-only)
 - Follow the same PR policy as local agents
 

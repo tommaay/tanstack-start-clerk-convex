@@ -43,8 +43,10 @@ fi
 if curl -sf -o /dev/null http://127.0.0.1:3210/version; then
   echo "Convex local backend already running on port 3210; skipping deploy."
 else
-  # `convex/auth.config.ts` reads this deployment variable at push time and
-  # `convex dev` fails when it is unset. `env set` works before the first deploy.
+  # Recipe from `npx convex init --help`: `init` writes .env.local without a
+  # push, so `env set` has a deployment to target. `convex/auth.config.ts`
+  # reads CLERK_JWT_ISSUER_DOMAIN at push time and `convex dev` fails when unset.
+  CONVEX_AGENT_MODE=anonymous pnpm exec convex init
   CONVEX_AGENT_MODE=anonymous pnpm exec convex env set CLERK_JWT_ISSUER_DOMAIN \
     "${CLERK_JWT_ISSUER_DOMAIN:-https://placeholder.clerk.accounts.dev}"
   CONVEX_AGENT_MODE=anonymous pnpm exec convex dev --once
