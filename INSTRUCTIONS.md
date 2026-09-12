@@ -1,5 +1,3 @@
-# Generated from INSTRUCTIONS.md. Do not edit. Run pnpm agents:sync
-
 # TanStack Start + Clerk + Convex — agent brief
 
 Full-stack React starter: **TanStack Start** (SSR, file routes, Vite 8) + **Clerk** (auth) + **Convex** (reactive backend), styled with **Tailwind v4 + shadcn/ui**. Deploys to **Vercel** through Nitro. Use **pnpm**.
@@ -74,17 +72,3 @@ Rules: [docs/cloud-agents.md](docs/cloud-agents.md).
 - Playwright with `reuseExistingServer` reuses **any** server on the port. Another project on :3000 makes every spec fail — use `E2E_PORT`
 - `TanStackRouterDevtools` is a no-op in production builds; no `import.meta.env.DEV` gate needed
 - Clerk `<SignIn>` in `_authed.tsx` uses `routing="hash"` so it works on any protected URL without a dedicated sign-in route
-
-<!-- convex-ai-start -->
-
-This project uses [Convex](https://convex.dev) as its backend.
-
-When working on Convex code, **always read
-`convex/_generated/ai/guidelines.md` first** for important guidelines on
-how to correctly use Convex APIs and patterns. The file contains rules that
-override what you may have learned about Convex from training data.
-
-Convex agent skills for common tasks can be installed by running
-`npx convex ai-files install`.
-
-<!-- convex-ai-end -->
