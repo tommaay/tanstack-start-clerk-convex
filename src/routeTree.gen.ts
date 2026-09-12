@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as PostsRouteImport } from './routes/posts'
 import { Route as AuthedRouteImport } from './routes/_authed'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as E2eErrorRouteImport } from './routes/e2e/error'
 import { Route as AuthedUserRouteImport } from './routes/_authed/user'
 import { Route as AuthedDashboardRouteImport } from './routes/_authed/dashboard'
 
@@ -27,6 +28,11 @@ const AuthedRoute = AuthedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const E2eErrorRoute = E2eErrorRouteImport.update({
+  id: '/e2e/error',
+  path: '/e2e/error',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthedUserRoute = AuthedUserRouteImport.update({
@@ -45,12 +51,14 @@ export interface FileRoutesByFullPath {
   '/posts': typeof PostsRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/user': typeof AuthedUserRoute
+  '/e2e/error': typeof E2eErrorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/posts': typeof PostsRoute
   '/dashboard': typeof AuthedDashboardRoute
   '/user': typeof AuthedUserRoute
+  '/e2e/error': typeof E2eErrorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -59,12 +67,13 @@ export interface FileRoutesById {
   '/posts': typeof PostsRoute
   '/_authed/dashboard': typeof AuthedDashboardRoute
   '/_authed/user': typeof AuthedUserRoute
+  '/e2e/error': typeof E2eErrorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/posts' | '/dashboard' | '/user'
+  fullPaths: '/' | '/posts' | '/dashboard' | '/user' | '/e2e/error'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/posts' | '/dashboard' | '/user'
+  to: '/' | '/posts' | '/dashboard' | '/user' | '/e2e/error'
   id:
     | '__root__'
     | '/'
@@ -72,12 +81,14 @@ export interface FileRouteTypes {
     | '/posts'
     | '/_authed/dashboard'
     | '/_authed/user'
+    | '/e2e/error'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthedRoute: typeof AuthedRouteWithChildren
   PostsRoute: typeof PostsRoute
+  E2eErrorRoute: typeof E2eErrorRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -101,6 +112,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/e2e/error': {
+      id: '/e2e/error'
+      path: '/e2e/error'
+      fullPath: '/e2e/error'
+      preLoaderRoute: typeof E2eErrorRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authed/user': {
@@ -137,6 +155,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthedRoute: AuthedRouteWithChildren,
   PostsRoute: PostsRoute,
+  E2eErrorRoute: E2eErrorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
