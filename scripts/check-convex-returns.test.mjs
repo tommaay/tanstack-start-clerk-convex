@@ -213,6 +213,62 @@ export default query({ handler: async () => null });
     expect(result).toEqual({ args: true, returns: true, lines: [1, 1] });
   });
 
+  it('flags a registrar imported under an alias', () => {
+    const result = flagsFor(`import { query as q } from './_generated/server';
+
+export const list = q({ handler: async () => null });
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [3, 3] });
+  });
+
+  it('passes an aliased registrar that carries both validators', () => {
+    const result =
+      flagsFor(`import { mutation as m } from './_generated/server';
+
+export const create = m({ args: {}, returns: v.null(), handler: async () => null });
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
+  it('flags a local registrar exported through an exported alias', () => {
+    const result = flagsFor(`const list = query({ handler: async () => null });
+
+export const fetchAll = list;
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [1, 1] });
+  });
+
+  it('follows a chain of local aliases to the registrar call', () => {
+    const result = flagsFor(`const a = query({ handler: async () => null });
+const b = a;
+
+export { b };
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [1, 1] });
+  });
+
+  it('accepts computed literal keys for args and returns', () => {
+    const result = flagsFor(`export const list = query({
+  ['args']: {},
+  ["returns"]: v.null(),
+  handler: async () => null,
+});
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
+  it('does not accept a computed key whose value is a variable', () => {
+    const result = flagsFor(`const key = 'args';
+
+export const list = query({
+  [key]: {},
+  returns: v.null(),
+  handler: async () => null,
+});
+`);
+    expect(result).toEqual({ args: true, returns: false, lines: [3] });
+  });
+
   it('reports a registrar once when it is exported twice', () => {
     const result =
       flagsFor(`export const list = query({ handler: async () => null });

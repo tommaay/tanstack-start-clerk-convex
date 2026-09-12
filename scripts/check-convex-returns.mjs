@@ -52,7 +52,10 @@ const MISSING_RETURNS = 'Convex function is missing a `returns` validator.';
  * (a default export maps to the module path, see `server/api.js`). The scan
  * therefore covers `export const name = query(...)`,
  * `export default query(...)`, and locals exported later through
- * `export default name` or `export { name, name as other }`. The options
+ * `export default name`, `export const other = name`, or
+ * `export { name, name as other }`. Registrars imported under an alias
+ * (`import { query as q }`) are recognized. Registrars reached through a
+ * custom wrapper (`customQuery(...)`) are outside this check. The options
  * must be an inline object literal; any other first argument (a handler
  * callback, a variable) reports both validators as missing.
  *
@@ -76,9 +79,12 @@ export function scanConvexValidators({ relativePath, contents }) {
     SCRIPT_KIND_BY_EXTENSION.get(extname(normalized)) ?? ts.ScriptKind.TS,
   );
 
+  const { registrarNames } = getRegistrarNames({ sourceFile });
+
   /**
-   * Top-level `name = <registrar>(...)` declarations, exported or not, so a
-   * later `export { name }` / `export default name` can be traced back.
+   * Top-level `name = <registrar>(...)` declarations, exported or not, plus
+   * `other = name` aliases of them, so a later `export { name }`,
+   * `export default name`, or `export const x = name` can be traced back.
    * @type {Map<string, { call: import('typescript').CallExpression; node: import('typescript').Node }>}
    */
   const localRegistrars = new Map();
@@ -87,9 +93,20 @@ export function scanConvexValidators({ relativePath, contents }) {
       continue;
     }
     for (const declaration of statement.declarationList.declarations) {
-      const call = declaration.initializer;
-      if (call && ts.isIdentifier(declaration.name) && isRegistrarCall(call)) {
-        localRegistrars.set(declaration.name.text, { call, node: statement });
+      const initializer = declaration.initializer;
+      if (!initializer || !ts.isIdentifier(declaration.name)) {
+        continue;
+      }
+      if (isRegistrarCall({ expression: initializer, registrarNames })) {
+        localRegistrars.set(declaration.name.text, {
+          call: initializer,
+          node: statement,
+        });
+      } else if (ts.isIdentifier(initializer)) {
+        const aliased = localRegistrars.get(initializer.text);
+        if (aliased) {
+          localRegistrars.set(declaration.name.text, aliased);
+        }
       }
     }
   }
@@ -126,16 +143,22 @@ export function scanConvexValidators({ relativePath, contents }) {
   for (const statement of sourceFile.statements) {
     if (ts.isVariableStatement(statement) && isExported(statement)) {
       for (const declaration of statement.declarationList.declarations) {
-        const call = declaration.initializer;
-        if (call && isRegistrarCall(call)) {
-          check({ call, node: statement });
+        const initializer = declaration.initializer;
+        if (!initializer) {
+          continue;
+        }
+        if (isRegistrarCall({ expression: initializer, registrarNames })) {
+          check({ call: initializer, node: statement });
+        } else if (ts.isIdentifier(initializer)) {
+          checkLocal(initializer.text);
         }
       }
     } else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
-      if (isRegistrarCall(statement.expression)) {
-        check({ call: statement.expression, node: statement });
-      } else if (ts.isIdentifier(statement.expression)) {
-        checkLocal(statement.expression.text);
+      const { expression } = statement;
+      if (isRegistrarCall({ expression, registrarNames })) {
+        check({ call: expression, node: statement });
+      } else if (ts.isIdentifier(expression)) {
+        checkLocal(expression.text);
       }
     } else if (
       ts.isExportDeclaration(statement) &&
@@ -170,16 +193,43 @@ function isExported(statement) {
 }
 
 /**
+ * Local names that refer to a Convex registrar in this file: the canonical
+ * names plus any alias from a named import (`import { query as q }`).
+ *
+ * @param {{ sourceFile: import('typescript').SourceFile }} params Parsed file
+ * @returns {{ registrarNames: Set<string> }}
+ */
+function getRegistrarNames({ sourceFile }) {
+  const registrarNames = new Set(REGISTRAR_NAMES);
+  for (const statement of sourceFile.statements) {
+    const bindings = ts.isImportDeclaration(statement)
+      ? statement.importClause?.namedBindings
+      : undefined;
+    if (!bindings || !ts.isNamedImports(bindings)) {
+      continue;
+    }
+    for (const element of bindings.elements) {
+      const imported = (element.propertyName ?? element.name).text;
+      if (REGISTRAR_NAMES.has(imported)) {
+        registrarNames.add(element.name.text);
+      }
+    }
+  }
+  return { registrarNames };
+}
+
+/**
  * Whether an expression is a call to a Convex registrar such as `query(...)`.
  *
- * @param {import('typescript').Expression} expression Initializer expression
+ * @param {{ expression: import('typescript').Expression; registrarNames: Set<string> }} params
+ *   Candidate expression and the registrar names valid in its file
  * @returns {expression is import('typescript').CallExpression}
  */
-function isRegistrarCall(expression) {
+function isRegistrarCall({ expression, registrarNames }) {
   return (
     ts.isCallExpression(expression) &&
     ts.isIdentifier(expression.expression) &&
-    REGISTRAR_NAMES.has(expression.expression.text)
+    registrarNames.has(expression.expression.text)
   );
 }
 
@@ -202,15 +252,24 @@ export function getOptionsPropertyNames({ call }) {
   }
 
   for (const property of options.properties) {
-    if (ts.isSpreadAssignment(property)) {
+    if (ts.isSpreadAssignment(property) || !property.name) {
       continue;
     }
     const name = property.name;
-    if (
-      name &&
-      (ts.isIdentifier(name) ||
-        ts.isStringLiteral(name) ||
-        ts.isNumericLiteral(name))
+    if (ts.isComputedPropertyName(name)) {
+      // `["args"]` counts; `[someVariable]` does not, its value is unknown.
+      const key = name.expression;
+      if (
+        ts.isStringLiteral(key) ||
+        ts.isNoSubstitutionTemplateLiteral(key) ||
+        ts.isNumericLiteral(key)
+      ) {
+        names.add(key.text);
+      }
+    } else if (
+      ts.isIdentifier(name) ||
+      ts.isStringLiteral(name) ||
+      ts.isNumericLiteral(name)
     ) {
       names.add(name.text);
     }
