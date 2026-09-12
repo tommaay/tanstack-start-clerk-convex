@@ -15,7 +15,9 @@ export function UserMenu() {
   const { user } = useUser();
   const { signOut } = useClerk();
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   const email = user.primaryEmailAddress?.emailAddress;
   const initials =

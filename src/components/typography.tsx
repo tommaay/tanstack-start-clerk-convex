@@ -104,4 +104,4 @@ function Small({ className, ...props }: ComponentProps<'small'>) {
   );
 }
 
-export { H1, H2, H3, P, Lead, Muted, Small };
+export { H1, H2, H3, Lead, Muted, P, Small };

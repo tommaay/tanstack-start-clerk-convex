@@ -1,6 +1,6 @@
 import { Link } from '@tanstack/react-router';
-import { Button } from '~/components/ui/button';
 import { H1, Muted } from '~/components/typography';
+import { Button } from '~/components/ui/button';
 
 export function NotFound() {
   return (

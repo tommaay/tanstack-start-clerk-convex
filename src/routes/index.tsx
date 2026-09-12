@@ -1,5 +1,5 @@
-import { Link, createFileRoute } from '@tanstack/react-router';
 import { Show, SignInButton } from '@clerk/tanstack-react-start';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { Button } from '~/components/ui/button';
 import {
   Card,

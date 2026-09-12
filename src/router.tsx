@@ -1,14 +1,27 @@
+/**
+ * Router factory with Convex (real-time) + React Query integration.
+ *
+ * A new router is created per request. Each router gets its own
+ * `ConvexReactClient` (WebSocket on the client, HTTP on the server),
+ * `ConvexQueryClient`, and `QueryClient`, wired together through
+ * `setupRouterSsrQueryIntegration` for SSR dehydration/hydration.
+ *
+ * App-wide error and not-found fallbacks are registered here so routes
+ * inherit them.
+ */
+import { ConvexQueryClient } from '@convex-dev/react-query';
+import { QueryClient } from '@tanstack/react-query';
 import { createRouter } from '@tanstack/react-router';
 import { setupRouterSsrQueryIntegration } from '@tanstack/react-router-ssr-query';
 import { ConvexProvider, ConvexReactClient } from 'convex/react';
-import { ConvexQueryClient } from '@convex-dev/react-query';
-import { QueryClient } from '@tanstack/react-query';
-import { routeTree } from './routeTree.gen';
 import { DefaultCatchBoundary } from '~/components/error-boundary';
 import { NotFound } from '~/components/not-found';
+import { routeTree } from './routeTree.gen';
 
+/** Build the router for one request (server) or the browser session (client). */
 export function getRouter() {
-  const CONVEX_URL = (import.meta as any).env.VITE_CONVEX_URL!;
+  // `VITE_*` values are inlined at build time; this is client-safe.
+  const CONVEX_URL: string | undefined = import.meta.env.VITE_CONVEX_URL;
   if (!CONVEX_URL) {
     throw new Error('missing VITE_CONVEX_URL envar');
   }
@@ -28,7 +41,6 @@ export function getRouter() {
   });
   convexQueryClient.connect(queryClient);
 
-  // @snippet start example
   const router = createRouter({
     routeTree,
     defaultPreload: 'intent',
@@ -45,7 +57,6 @@ export function getRouter() {
   });
 
   setupRouterSsrQueryIntegration({ router, queryClient });
-  // @snippet end example
 
   return router;
 }
