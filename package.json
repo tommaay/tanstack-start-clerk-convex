@@ -18,7 +18,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "convex:generate": "convex dev --once",
-    "convex:check": "pnpm convex:generate && git diff --exit-code HEAD -- convex/_generated ':!convex/_generated/ai'",
+    "convex:check": "pnpm convex:generate && git diff --exit-code HEAD -- convex/_generated ':!convex/_generated/ai' && git ls-files --others --exclude-standard -- convex/_generated ':!convex/_generated/ai' | { ! grep . ; }",
     "check:core": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm convex:check",
     "check": "pnpm check:core && pnpm test:e2e",
     "agents:sync": "node scripts/sync-agent-docs.mjs",
