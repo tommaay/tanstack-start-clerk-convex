@@ -26,19 +26,39 @@ pnpm install --frozen-lockfile --ignore-scripts
 
 # 2. Clerk keys for the dev server. `clerkMiddleware()` throws on every request
 #    without CLERK_SECRET_KEY, so warn loudly when the secrets are missing.
-if [ ! -f .env ]; then
-  if [ -z "${CLERK_PUBLISHABLE_KEY:-}" ] || [ -z "${CLERK_SECRET_KEY:-}" ]; then
-    echo "WARNING: CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY are not set. The app will return 500 until you add them (Cursor Secrets or .env)." >&2
+#    Each key is managed on its own: a non-blank value already in `.env` wins
+#    (user-edited), a blank or missing key takes the current environment value.
+#    A first run without secrets therefore does not pin empty keys forever.
+
+# Print the value of `$1` from `.env`, or nothing when the key is absent/blank.
+env_file_value() {
+  [ -f .env ] || return 0
+  grep -E "^$1=" .env | head -n 1 | cut -d= -f2-
+}
+
+# Set `$1=$2` in `.env` unless `.env` already holds a non-blank value for `$1`.
+ensure_env_key() {
+  local name="$1" value="$2"
+  if [ -n "$(env_file_value "$name")" ]; then
+    return 0
   fi
-  # Owner-only mode: the file holds CLERK_SECRET_KEY. The subshell keeps the
-  # restrictive umask from leaking into later steps.
-  (
-    umask 077
-    cat > .env <<EOF
-CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY:-}
-CLERK_SECRET_KEY=${CLERK_SECRET_KEY:-}
-EOF
-  )
+  if [ -f .env ] && grep -qE "^${name}=" .env; then
+    # `grep -v` exits 1 when nothing is left; that is not an error here.
+    grep -vE "^${name}=" .env > .env.tmp || true
+    mv .env.tmp .env
+  fi
+  printf '%s=%s\n' "$name" "$value" >> .env
+}
+
+# Owner-only mode: the file holds CLERK_SECRET_KEY. The subshell keeps the
+# restrictive umask from leaking into later steps.
+(
+  umask 077
+  ensure_env_key CLERK_PUBLISHABLE_KEY "${CLERK_PUBLISHABLE_KEY:-}"
+  ensure_env_key CLERK_SECRET_KEY "${CLERK_SECRET_KEY:-}"
+)
+if [ -z "$(env_file_value CLERK_PUBLISHABLE_KEY)" ] || [ -z "$(env_file_value CLERK_SECRET_KEY)" ]; then
+  echo "WARNING: CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY are blank in .env. The app will return 500 until you add them (Cursor Secrets, then re-run this script, or edit .env)." >&2
 fi
 
 # 3. Anonymous local Convex deployment.
