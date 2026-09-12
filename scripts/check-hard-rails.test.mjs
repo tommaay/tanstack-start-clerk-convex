@@ -122,6 +122,9 @@ const b = 2; // do not inline because tests spy on it
       "import { requireEnv } from '~/utils/env.jsx';\n",
     ],
     ['.mjs extension import', "import '../../utils/logger.mjs';\n"],
+    ['named re-export', "export { logger } from '~/utils/logger';\n"],
+    ['star re-export', "export * from '../utils/env';\n"],
+    ['import-equals require', "import env = require('~/utils/env');\n"],
   ])('flags a %s of a server-only module from src/lib', (_label, contents) => {
     const { findings } = scanSourceFile({
       relativePath: 'src/lib/helpers.ts',
@@ -130,6 +133,43 @@ const b = 2; // do not inline because tests spy on it
     expect(findings.some((item) => item.message.includes('Server-only'))).toBe(
       true,
     );
+  });
+
+  it('reports the line of each server-only import', () => {
+    const { findings } = scanSourceFile({
+      relativePath: 'src/components/widget.tsx',
+      contents: `// Server helpers live in ~/utils.
+import { logger } from '~/utils/logger';
+import { cn } from '~/lib/utils';
+const { requireEnv } = await import('../utils/env');
+`,
+    });
+    expect(findings.map((item) => item.line)).toEqual([2, 4]);
+  });
+
+  it.each([
+    [
+      'line comment that names the import',
+      "// Rule: never import '~/utils/logger' in components; use console.error here.\nexport function Widget() { return null; }\n",
+    ],
+    [
+      'block comment that names the import',
+      "/* import { logger } from '~/utils/logger' is server-only */\nexport const a = 1;\n",
+    ],
+    [
+      'string that names the import',
+      'const hint = "import { logger } from \'~/utils/logger\'";\n',
+    ],
+    [
+      'require with a non-literal argument',
+      "const name = '~/utils/logger'; const mod = require(name);\n",
+    ],
+  ])('does not treat a %s as a server-only import', (_label, contents) => {
+    const { findings } = scanSourceFile({
+      relativePath: 'src/components/widget.tsx',
+      contents,
+    });
+    expect(findings).toEqual([]);
   });
 
   it('allows the logger in routes and server utilities', () => {

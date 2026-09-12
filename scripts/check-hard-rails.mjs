@@ -9,7 +9,9 @@
  *    `INSTRUCTIONS.md` or lint.
  * 2. Server-only modules (`~/utils/logger`, `~/utils/env`) must not be imported
  *    from `src/components/**` or `src/lib/**`. Those folders ship to the
- *    browser; Winston and `process.env` do not work there.
+ *    browser; Winston and `process.env` do not work there. Imports come from
+ *    the parser too, so a comment or string that names the module does not
+ *    count.
  *
  * Add a rail here when agents repeat the same mistake, not ahead of time.
  */
@@ -33,12 +35,13 @@ const SCRIPT_KIND_BY_EXTENSION = new Map([
 /** Applied to each line of a comment, never to code. */
 const HISTORY_PHRASE_RE = /\b(?:do not|don't|never)\b.*\bbecause\b/i;
 /**
- * Static `from "…"`, side-effect `import "…"`, dynamic `import("…")`, and
- * `require("…")` of a server-only module. Any source extension counts: Vite
- * resolves `logger.js` to `logger.ts` when the `.js` file does not exist.
+ * Module specifier of a server-only module: `~/utils/logger`, `~/utils/env`,
+ * or a relative path to either, with or without a source extension. Any
+ * source extension counts: Vite resolves `logger.js` to `logger.ts` when the
+ * `.js` file does not exist.
  */
-const SERVER_ONLY_IMPORT_RE =
-  /(?:\bfrom\s+|\bimport\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:~\/utils\/(?:logger|env)|(?:\.\.?\/)+utils\/(?:logger|env))(?:\.(?:ts|tsx|mts|js|jsx|mjs))?["']/;
+const SERVER_ONLY_SPECIFIER_RE =
+  /^(?:~\/utils\/(?:logger|env)|(?:\.\.?\/)+utils\/(?:logger|env))(?:\.(?:ts|tsx|mts|js|jsx|mjs))?$/;
 const CLIENT_ONLY_PREFIXES = ['src/components/', 'src/lib/'];
 
 /**
@@ -61,43 +64,40 @@ export function isClientOnlyPath({ relativePath }) {
 }
 
 /**
- * Return the 1-based line of the first match, or 1 when the pattern is not found.
+ * Parse a file with the TypeScript parser, picking the flavor by extension.
  *
- * @param {{ contents: string; pattern: RegExp }} params File text and pattern
- * @returns {{ line: number }}
+ * @param {{ relativePath: string; contents: string }} params Path and file text
+ * @returns {{ sourceFile: import('typescript').SourceFile }}
  */
-function lineOf({ contents, pattern }) {
-  const index = contents.search(pattern);
-  if (index < 0) {
-    return { line: 1 };
-  }
-  return { line: contents.slice(0, index).split('\n').length };
+function parseSourceFile({ relativePath, contents }) {
+  return {
+    sourceFile: ts.createSourceFile(
+      relativePath,
+      contents,
+      ts.ScriptTarget.Latest,
+      true,
+      SCRIPT_KIND_BY_EXTENSION.get(extname(relativePath)) ?? ts.ScriptKind.TS,
+    ),
+  };
 }
 
 /**
- * Every comment in a file, as `{ pos, end }` ranges into `contents`.
+ * Every comment in a file, as `{ pos, end }` ranges into `sourceFile.text`.
  *
- * The file is parsed, then the trivia in front of every token
- * (`[getFullStart(), getStart())`) is read with `ts.getLeadingCommentRanges`
- * and `ts.getTrailingCommentRanges`. Tokens carry the trivia, so comment
- * text inside strings, template literals and regex literals is never
- * returned. JSX text needs the extra bound: the range scanners are
- * context-free and would report `//` inside `<p>// text</p>`, while
- * `getStart()` stops there because JSX text cannot hold comments
- * (`getTokenPosOfNode` in the TypeScript compiler).
+ * The trivia in front of every token (`[getFullStart(), getStart())`) is
+ * read with `ts.getLeadingCommentRanges` and `ts.getTrailingCommentRanges`.
+ * Tokens carry the trivia, so comment text inside strings, template literals
+ * and regex literals is never returned. JSX text needs the extra bound: the
+ * range scanners are context-free and would report `//` inside
+ * `<p>// text</p>`, while `getStart()` stops there because JSX text cannot
+ * hold comments (`getTokenPosOfNode` in the TypeScript compiler).
  * Source: https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
  *
- * @param {{ relativePath: string; contents: string }} params Path and file text
+ * @param {{ sourceFile: import('typescript').SourceFile }} params Parsed file
  * @returns {{ comments: Array<{ pos: number; end: number }> }}
  */
-export function getCommentRanges({ relativePath, contents }) {
-  const sourceFile = ts.createSourceFile(
-    relativePath,
-    contents,
-    ts.ScriptTarget.Latest,
-    true,
-    SCRIPT_KIND_BY_EXTENSION.get(extname(relativePath)) ?? ts.ScriptKind.TS,
-  );
+export function getCommentRanges({ sourceFile }) {
+  const contents = sourceFile.text;
   /** @type {Map<number, { pos: number; end: number }>} */
   const byPos = new Map();
   /** @param {import('typescript').Node} node Any node or token */
@@ -127,6 +127,55 @@ export function getCommentRanges({ relativePath, contents }) {
 }
 
 /**
+ * Every module specifier the file loads, with the 1-based line of the literal.
+ *
+ * Counted: static `import … from "…"` and side-effect `import "…"`,
+ * re-exports `export … from "…"`, `import x = require("…")`, dynamic
+ * `import("…")`, and `require("…")` calls with a literal argument. The walk
+ * visits AST nodes only, so a comment or string that names a module is never
+ * returned.
+ * Source: https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
+ *
+ * @param {{ sourceFile: import('typescript').SourceFile }} params Parsed file
+ * @returns {{ specifiers: Array<{ text: string; line: number }> }}
+ */
+export function getModuleSpecifiers({ sourceFile }) {
+  /** @type {Array<{ text: string; line: number }>} */
+  const specifiers = [];
+  /** @param {import('typescript').Node | undefined} expression Module literal */
+  const record = (expression) => {
+    if (!expression || !ts.isStringLiteralLike(expression)) {
+      return;
+    }
+    const { line } = sourceFile.getLineAndCharacterOfPosition(
+      expression.getStart(sourceFile),
+    );
+    specifiers.push({ text: expression.text, line: line + 1 });
+  };
+  /** @param {import('typescript').Node} node Any node */
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
+      record(node.moduleSpecifier);
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference)
+    ) {
+      record(node.moduleReference.expression);
+    } else if (
+      ts.isCallExpression(node) &&
+      (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
+        (ts.isIdentifier(node.expression) &&
+          node.expression.text === 'require'))
+    ) {
+      record(node.arguments[0]);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return { specifiers };
+}
+
+/**
  * Collect hard-rail violations in one source file.
  *
  * @param {{ relativePath: string; contents: string }} params Path and file text
@@ -136,8 +185,12 @@ export function scanSourceFile({ relativePath, contents }) {
   /** @type {RailFinding[]} */
   const findings = [];
   const normalized = relativePath.replaceAll('\\', '/');
+  const { sourceFile } = parseSourceFile({
+    relativePath: normalized,
+    contents,
+  });
 
-  const { comments } = getCommentRanges({ relativePath: normalized, contents });
+  const { comments } = getCommentRanges({ sourceFile });
   for (const { pos, end } of comments) {
     const commentLines = contents.slice(pos, end).split('\n');
     const firstLine = contents.slice(0, pos).split('\n').length;
@@ -155,13 +208,19 @@ export function scanSourceFile({ relativePath, contents }) {
   }
 
   const { isClientOnly } = isClientOnlyPath({ relativePath: normalized });
-  if (isClientOnly && SERVER_ONLY_IMPORT_RE.test(contents)) {
-    findings.push({
-      file: normalized,
-      line: lineOf({ contents, pattern: SERVER_ONLY_IMPORT_RE }).line,
-      message:
-        'Server-only module imported from client code. ~/utils/logger and ~/utils/env are Node-only; call them from a server function instead.',
-    });
+  if (isClientOnly) {
+    const { specifiers } = getModuleSpecifiers({ sourceFile });
+    for (const { text, line } of specifiers) {
+      if (!SERVER_ONLY_SPECIFIER_RE.test(text)) {
+        continue;
+      }
+      findings.push({
+        file: normalized,
+        line,
+        message:
+          'Server-only module imported from client code. ~/utils/logger and ~/utils/env are Node-only; call them from a server function instead.',
+      });
+    }
   }
 
   return { findings };
