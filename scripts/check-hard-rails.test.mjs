@@ -44,6 +44,61 @@ describe('scanSourceFile', () => {
     expect(findings).toEqual([]);
   });
 
+  it('reports the exact line inside a multi-line comment', () => {
+    const { findings } = scanSourceFile({
+      relativePath: 'src/routes/index.tsx',
+      contents: `const a = 1;
+/**
+ * Loads posts.
+ * Never call twice because it double-charges.
+ */
+const b = 2; // do not inline because tests spy on it
+`,
+    });
+    expect(findings.map((finding) => finding.line)).toEqual([4, 6]);
+  });
+
+  it.each([
+    ['plain string', 'const s = "Never do this because it breaks";\n'],
+    [
+      'string with a URL before the phrase',
+      'const s = "See https://x.io - never do this because it breaks";\n',
+    ],
+    ['regex literal', 'const re = /\\/\\/ never .* because/;\n'],
+    [
+      'template literal',
+      `const t = \`/* do not retry because ${['$', '{', 'reason', '}'].join('')} */\`;\n`,
+    ],
+    [
+      'multiplication before a string',
+      'const n = a * b; const s = "do not retry because it loops";\n',
+    ],
+  ])('does not treat a %s as a history comment', (_label, contents) => {
+    const { findings } = scanSourceFile({
+      relativePath: 'src/routes/index.ts',
+      contents,
+    });
+    expect(findings).toEqual([]);
+  });
+
+  it('does not treat JSX text as a history comment', () => {
+    const { findings } = scanSourceFile({
+      relativePath: 'src/routes/index.tsx',
+      contents:
+        'export const P = () => <p>// never do this because it breaks</p>;\n',
+    });
+    expect(findings).toEqual([]);
+  });
+
+  it('flags history comments in JavaScript files', () => {
+    const { findings } = scanSourceFile({
+      relativePath: 'convex/legacy.js',
+      contents:
+        'export const x = 1; // never change because prod depends on it\n',
+    });
+    expect(findings.map((finding) => finding.line)).toEqual([1]);
+  });
+
   it('flags the logger imported from a component', () => {
     const { findings } = scanSourceFile({
       relativePath: 'src/components/user-menu.tsx',
@@ -61,6 +116,12 @@ describe('scanSourceFile', () => {
     ['side-effect import with double quotes', 'import "../utils/env.ts";\n'],
     ['dynamic import', "const { logger } = await import('~/utils/logger');\n"],
     ['require', "const { logger } = require('~/utils/logger');\n"],
+    ['.js extension import', "import { logger } from '../utils/logger.js';\n"],
+    [
+      '.jsx extension import',
+      "import { requireEnv } from '~/utils/env.jsx';\n",
+    ],
+    ['.mjs extension import', "import '../../utils/logger.mjs';\n"],
   ])('flags a %s of a server-only module from src/lib', (_label, contents) => {
     const { findings } = scanSourceFile({
       relativePath: 'src/lib/helpers.ts',
