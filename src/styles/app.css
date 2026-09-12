@@ -119,6 +119,7 @@
   }
 
   .using-mouse * {
+    /* biome-ignore lint/complexity/noImportantStyles: must beat per-element focus outlines while the pointer is a mouse */
     outline: none !important;
   }
 }

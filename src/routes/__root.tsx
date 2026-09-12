@@ -1,28 +1,28 @@
-import {
-  HeadContent,
-  Link,
-  Outlet,
-  Scripts,
-  createRootRouteWithContext,
-  useRouteContext,
-} from '@tanstack/react-router';
+import type * as React from 'react';
 import {
   ClerkProvider,
   Show,
   SignInButton,
   useAuth,
 } from '@clerk/tanstack-react-start';
+import { auth } from '@clerk/tanstack-react-start/server';
+import type { ConvexQueryClient } from '@convex-dev/react-query';
+import type { QueryClient } from '@tanstack/react-query';
+import {
+  createRootRouteWithContext,
+  HeadContent,
+  Link,
+  Outlet,
+  Scripts,
+  useRouteContext,
+} from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { createServerFn } from '@tanstack/react-start';
-import * as React from 'react';
-import { auth } from '@clerk/tanstack-react-start/server';
-import { ConvexProviderWithClerk } from 'convex/react-clerk';
-import type { ConvexQueryClient } from '@convex-dev/react-query';
 import type { ConvexReactClient } from 'convex/react';
-import type { QueryClient } from '@tanstack/react-query';
+import { ConvexProviderWithClerk } from 'convex/react-clerk';
+import { ContentContainer } from '~/components/content-container';
 import { Button } from '~/components/ui/button';
 import { Toaster } from '~/components/ui/sonner';
-import { ContentContainer } from '~/components/content-container';
 import { UserMenu } from '~/components/user-menu';
 import appCss from '~/styles/app.css?url';
 

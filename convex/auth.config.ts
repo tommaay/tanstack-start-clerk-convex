@@ -1,13 +1,19 @@
+/**
+ * Convex auth provider: the Clerk JWT template named `convex`.
+ *
+ * `CLERK_JWT_ISSUER_DOMAIN` is a **Convex deployment** variable (dashboard →
+ * Settings → Environment Variables, or `npx convex env set`). It is the Issuer
+ * URL of the `convex` JWT template, e.g. `https://your-app.clerk.accounts.dev`.
+ * `convex dev` fails when it is missing. Cloud agents and CI set it on the
+ * anonymous deployment first (see `.cursor/install.sh` and
+ * `.github/workflows/check.yml`).
+ * See https://docs.convex.dev/auth/clerk#configuring-dev-and-prod-instances
+ */
 import type { AuthConfig } from 'convex/server';
 
 export default {
   providers: [
     {
-      // Replace with your own Clerk Issuer URL from your "convex" JWT template
-      // or with `process.env.CLERK_JWT_ISSUER_DOMAIN`
-      // and configure CLERK_JWT_ISSUER_DOMAIN on the Convex Dashboard
-      // See https://docs.convex.dev/auth/clerk#configuring-dev-and-prod-instances
-      // Should look similar to 'https://main-swine-30.clerk.accounts.dev'.
       domain: process.env.CLERK_JWT_ISSUER_DOMAIN!,
       applicationID: 'convex',
     },

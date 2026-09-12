@@ -1,3 +1,7 @@
+/**
+ * Convex schema. `schema.doc("table")` gives the full-document validator for
+ * `returns` (see `convex/_generated/ai/guidelines.md`).
+ */
 import { defineSchema, defineTable } from 'convex/server';
 import { v } from 'convex/values';
 

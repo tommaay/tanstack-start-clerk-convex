@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { api } from 'convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
-import { Outlet, createFileRoute } from '@tanstack/react-router';
-import { useAction } from 'convex/react';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
+import { api } from 'convex/_generated/api';
+import { useAction } from 'convex/react';
 import { toast } from 'sonner';
+import { H1 } from '~/components/typography';
 import { Button } from '~/components/ui/button';
 import {
   Card,
@@ -13,7 +14,6 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
-import { H1 } from '~/components/typography';
 
 export const Route = createFileRoute('/posts')({
   loader: async ({ context }) => {

@@ -4,11 +4,14 @@ node_modules
 !.env
 .env
 .env.local
+# Anonymous local Convex deployment state (CONVEX_AGENT_MODE=anonymous)
+.convex/
 .DS_Store
 .cache
 
-# Local agent/editor settings (machine-specific)
-.claude/settings.local.json
+# Local agent/editor settings (machine-specific). Skills live in .agents/skills.
+.claude/
+lefthook-local.yml
 .vercel
 .output
 .nitro
@@ -27,5 +30,6 @@ node_modules
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+/playwright/.clerk/
 
 app.config.timestamp_*.js

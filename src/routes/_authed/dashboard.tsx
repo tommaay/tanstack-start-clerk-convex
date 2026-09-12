@@ -1,9 +1,10 @@
-import { createFileRoute } from '@tanstack/react-router';
 import { useUser } from '@clerk/tanstack-react-start';
-import { api } from 'convex/_generated/api';
 import { convexQuery } from '@convex-dev/react-query';
 import { useSuspenseQuery } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
+import { api } from 'convex/_generated/api';
 import { toast } from 'sonner';
+import { H1, Muted } from '~/components/typography';
 import { Button } from '~/components/ui/button';
 import {
   Card,
@@ -12,7 +13,6 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
-import { H1, Muted } from '~/components/typography';
 
 export const Route = createFileRoute('/_authed/dashboard')({
   component: Dashboard,
