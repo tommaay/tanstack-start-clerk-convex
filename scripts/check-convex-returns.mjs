@@ -3,17 +3,28 @@
  *
  * ESLint already enforces `args` via `@convex-dev/require-args-validator`.
  * This script also requires `returns` on every registered function.
+ *
+ * Files are parsed with the TypeScript compiler API, so comments, strings,
+ * template literals and regular-expression literals cannot confuse the check.
+ * Source: https://github.com/microsoft/TypeScript/wiki/Using-the-Compiler-API
  */
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKIP_DIRS = new Set(['_generated', 'node_modules']);
-/** Returned when a function-form registrar passes a direct handler callback. */
-const DIRECT_CALLBACK_FORM = -2;
-const REGISTRAR_NAME_RE =
-  /export\s+const\s+\w+\s*=\s*(internal(?:Query|Mutation|Action)|query|mutation|action)\b/g;
+const REGISTRAR_NAMES = new Set([
+  'query',
+  'mutation',
+  'action',
+  'internalQuery',
+  'internalMutation',
+  'internalAction',
+]);
+const MISSING_ARGS = 'Convex function is missing an `args` validator.';
+const MISSING_RETURNS = 'Convex function is missing a `returns` validator.';
 
 /**
  * @typedef {{ file: string; line: number; message: string }} ValidatorFinding
@@ -22,10 +33,15 @@ const REGISTRAR_NAME_RE =
 /**
  * Scan one Convex source file for missing args or returns on registered functions.
  *
+ * A registered function is `export const name = <registrar>(...)`. The options
+ * must be an inline object literal; any other first argument (a handler
+ * callback, a variable) reports both validators as missing.
+ *
  * @param {{ relativePath: string; contents: string }} params Path and file text
  * @returns {{ findings: ValidatorFinding[] }}
  */
 export function scanConvexValidators({ relativePath, contents }) {
+  /** @type {ValidatorFinding[]} */
   const findings = [];
   const normalized = relativePath.replaceAll('\\', '/');
 
@@ -33,63 +49,36 @@ export function scanConvexValidators({ relativePath, contents }) {
     return { findings };
   }
 
-  for (const match of contents.matchAll(REGISTRAR_NAME_RE)) {
-    const line = contents.slice(0, match.index).split('\n').length;
-    const registrarEnd = (match.index ?? 0) + match[0].length;
-    const openParenIndex = findNextCharIndex({
-      contents,
-      startIndex: registrarEnd,
-      char: '(',
-    });
-    if (openParenIndex < 0) {
+  const sourceFile = ts.createSourceFile(
+    normalized,
+    contents,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS,
+  );
+
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement) || !isExported(statement)) {
       continue;
     }
 
-    const objectStart = findRegistrarOptionsObject({
-      contents,
-      openParenIndex,
-    });
-    if (objectStart === DIRECT_CALLBACK_FORM) {
-      findings.push({
-        file: normalized,
-        line,
-        message: 'Convex function is missing an `args` validator.',
-      });
-      findings.push({
-        file: normalized,
-        line,
-        message: 'Convex function is missing a `returns` validator.',
-      });
-      continue;
-    }
-    if (objectStart < 0) {
-      continue;
-    }
+    for (const declaration of statement.declarationList.declarations) {
+      const call = declaration.initializer;
+      if (!call || !isRegistrarCall(call)) {
+        continue;
+      }
 
-    const objectText = readBalancedObject({
-      contents,
-      openBraceIndex: objectStart,
-    });
-    if (!objectText) {
-      continue;
-    }
+      const line =
+        sourceFile.getLineAndCharacterOfPosition(statement.getStart(sourceFile))
+          .line + 1;
+      const { names } = getOptionsPropertyNames({ call });
 
-    const propertyNames = getTopLevelPropertyNames({ objectText });
-
-    if (!propertyNames.has('args')) {
-      findings.push({
-        file: normalized,
-        line,
-        message: 'Convex function is missing an `args` validator.',
-      });
-    }
-
-    if (!propertyNames.has('returns')) {
-      findings.push({
-        file: normalized,
-        line,
-        message: 'Convex function is missing a `returns` validator.',
-      });
+      if (!names.has('args')) {
+        findings.push({ file: normalized, line, message: MISSING_ARGS });
+      }
+      if (!names.has('returns')) {
+        findings.push({ file: normalized, line, message: MISSING_RETURNS });
+      }
     }
   }
 
@@ -97,563 +86,70 @@ export function scanConvexValidators({ relativePath, contents }) {
 }
 
 /**
- * Find the next `{` outside comments and string literals.
+ * Whether a statement carries the `export` modifier.
  *
- * @param {{ contents: string; startIndex: number }} params Source text and search start
- * @returns {number} Index of the brace, or `-1` when none is found
+ * @param {import('typescript').Statement} statement AST statement
+ * @returns {boolean}
  */
-export function findNextObjectBraceIndex({ contents, startIndex }) {
-  return findNextCharIndex({ contents, startIndex, char: '{' });
+function isExported(statement) {
+  const modifiers = ts.canHaveModifiers(statement)
+    ? ts.getModifiers(statement)
+    : undefined;
+  return (
+    modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+    ) ?? false
+  );
 }
 
 /**
- * Find the registrar options object for object-form and function-form calls.
+ * Whether an expression is a call to a Convex registrar such as `query(...)`.
  *
- * @param {{ contents: string; openParenIndex: number }} params Source text and `(` index
- * @returns {number} Index of the options `{`, or `-1`
+ * @param {import('typescript').Expression} expression Initializer expression
+ * @returns {expression is import('typescript').CallExpression}
  */
-export function findRegistrarOptionsObject({ contents, openParenIndex }) {
-  const argsStart = skipWhitespaceAndComments({
-    contents,
-    startIndex: openParenIndex + 1,
-  });
-  const rest = contents.slice(argsStart);
-  if (rest.startsWith('async') || rest.startsWith('function')) {
-    const arrowIndex = findNextArrowToken({ contents, startIndex: argsStart });
-    if (arrowIndex < 0) {
-      return -1;
-    }
-    const afterArrow = skipWhitespaceAndComments({
-      contents,
-      startIndex: arrowIndex + 2,
-    });
-    if (contents[afterArrow] === '{') {
-      return DIRECT_CALLBACK_FORM;
-    }
-    if (contents[afterArrow] === '(') {
-      return findNextObjectBraceIndex({
-        contents,
-        startIndex: afterArrow,
-      });
-    }
-    return -1;
-  }
-
-  return findNextObjectBraceIndex({ contents, startIndex: openParenIndex });
+function isRegistrarCall(expression) {
+  return (
+    ts.isCallExpression(expression) &&
+    ts.isIdentifier(expression.expression) &&
+    REGISTRAR_NAMES.has(expression.expression.text)
+  );
 }
 
 /**
- * Find the next `=>` token outside comments and string literals.
+ * Collect the top-level property names of a registrar's options object.
  *
- * @param {{ contents: string; startIndex: number }} params Source text and search start
- * @returns {number} Index of `=>`, or `-1`
- */
-export function findNextArrowToken({ contents, startIndex }) {
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let escaped = false;
-
-  for (let i = startIndex; i < contents.length - 1; i += 1) {
-    const ch = contents[i];
-    const next = contents[i + 1];
-
-    if (inLineComment) {
-      if (ch === '\n') {
-        inLineComment = false;
-      }
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if ((inSingle || inDouble || inTemplate) && ch === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (inSingle) {
-      if (ch === "'") {
-        inSingle = false;
-      }
-      continue;
-    }
-
-    if (inDouble) {
-      if (ch === '"') {
-        inDouble = false;
-      }
-      continue;
-    }
-
-    if (inTemplate) {
-      if (ch === '`') {
-        inTemplate = false;
-      }
-      continue;
-    }
-
-    if (ch === '/' && next === '/') {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === '/' && next === '*') {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (ch === '`') {
-      inTemplate = true;
-      continue;
-    }
-
-    if (ch === '=' && next === '>') {
-      return i;
-    }
-  }
-
-  return -1;
-}
-
-/**
- * Skip whitespace and comments, returning the next source index.
+ * Returns an empty set when the first argument is not an object literal, so
+ * function-form registrars report both validators as missing.
  *
- * @param {{ contents: string; startIndex: number }} params Source text and search start
- * @returns {number}
+ * @param {{ call: import('typescript').CallExpression }} params Registrar call
+ * @returns {{ names: Set<string> }}
  */
-export function skipWhitespaceAndComments({ contents, startIndex }) {
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let escaped = false;
-
-  for (let i = startIndex; i < contents.length; i += 1) {
-    const ch = contents[i];
-    const next = contents[i + 1];
-
-    if (inLineComment) {
-      if (ch === '\n') {
-        inLineComment = false;
-      }
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if ((inSingle || inDouble || inTemplate) && ch === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (inSingle) {
-      if (ch === "'") {
-        inSingle = false;
-      }
-      continue;
-    }
-
-    if (inDouble) {
-      if (ch === '"') {
-        inDouble = false;
-      }
-      continue;
-    }
-
-    if (inTemplate) {
-      if (ch === '`') {
-        inTemplate = false;
-      }
-      continue;
-    }
-
-    if (ch === '/' && next === '/') {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === '/' && next === '*') {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (ch === '`') {
-      inTemplate = true;
-      continue;
-    }
-
-    if (/\s/.test(ch)) {
-      continue;
-    }
-
-    return i;
-  }
-
-  return contents.length;
-}
-
-/**
- * Find the next character outside comments and string literals.
- *
- * @param {{ contents: string; startIndex: number; char: string }} params Source text and target char
- * @returns {number} Index of the character, or `-1`
- */
-export function findNextCharIndex({ contents, startIndex, char }) {
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let escaped = false;
-
-  for (let i = startIndex; i < contents.length; i += 1) {
-    const ch = contents[i];
-    const next = contents[i + 1];
-
-    if (inLineComment) {
-      if (ch === '\n') {
-        inLineComment = false;
-      }
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if ((inSingle || inDouble || inTemplate) && ch === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (inSingle) {
-      if (ch === "'") {
-        inSingle = false;
-      }
-      continue;
-    }
-
-    if (inDouble) {
-      if (ch === '"') {
-        inDouble = false;
-      }
-      continue;
-    }
-
-    if (inTemplate) {
-      if (ch === '`') {
-        inTemplate = false;
-      }
-      continue;
-    }
-
-    if (ch === '/' && next === '/') {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === '/' && next === '*') {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (ch === '`') {
-      inTemplate = true;
-      continue;
-    }
-
-    if (ch === char) {
-      return i;
-    }
-  }
-
-  return -1;
-}
-
-/**
- * Read a balanced `{ ... }` block starting at the opening brace.
- *
- * @param {{ contents: string; openBraceIndex: number }} params File text and `{` index
- * @returns {string | null}
- */
-function readBalancedObject({ contents, openBraceIndex }) {
-  let depth = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let escaped = false;
-
-  for (let i = openBraceIndex; i < contents.length; i += 1) {
-    const ch = contents[i];
-    const next = contents[i + 1];
-
-    if (inLineComment) {
-      if (ch === '\n') {
-        inLineComment = false;
-      }
-      continue;
-    }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-    if ((inSingle || inDouble || inTemplate) && ch === '\\') {
-      escaped = true;
-      continue;
-    }
-    if (inSingle) {
-      if (ch === "'") {
-        inSingle = false;
-      }
-      continue;
-    }
-    if (inDouble) {
-      if (ch === '"') {
-        inDouble = false;
-      }
-      continue;
-    }
-    if (inTemplate) {
-      if (ch === '`') {
-        inTemplate = false;
-      }
-      continue;
-    }
-    if (ch === '/' && next === '/') {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-    if (ch === '/' && next === '*') {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-    if (ch === '`') {
-      inTemplate = true;
-      continue;
-    }
-    if (ch === '{') {
-      depth += 1;
-      continue;
-    }
-    if (ch === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        return contents.slice(openBraceIndex, i + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
- * Collect top-level property names from a `{ ... }` object literal text block.
- *
- * @param {{ objectText: string }} params Balanced object literal
- * @returns {Set<string>}
- */
-export function getTopLevelPropertyNames({ objectText }) {
+export function getOptionsPropertyNames({ call }) {
+  /** @type {Set<string>} */
   const names = new Set();
-  let depth = 0;
-  let inSingle = false;
-  let inDouble = false;
-  let inTemplate = false;
-  let inLineComment = false;
-  let inBlockComment = false;
-  let escaped = false;
+  const options = call.arguments[0];
 
-  for (let i = 0; i < objectText.length; i += 1) {
-    const ch = objectText[i];
-    const next = objectText[i + 1];
+  if (!options || !ts.isObjectLiteralExpression(options)) {
+    return { names };
+  }
 
-    if (inLineComment) {
-      if (ch === '\n') {
-        inLineComment = false;
-      }
+  for (const property of options.properties) {
+    if (ts.isSpreadAssignment(property)) {
       continue;
     }
-
-    if (inBlockComment) {
-      if (ch === '*' && next === '/') {
-        inBlockComment = false;
-        i += 1;
-      }
-      continue;
-    }
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if ((inSingle || inDouble || inTemplate) && ch === '\\') {
-      escaped = true;
-      continue;
-    }
-
-    if (inSingle) {
-      if (ch === "'") {
-        inSingle = false;
-      }
-      continue;
-    }
-
-    if (inDouble) {
-      if (ch === '"') {
-        inDouble = false;
-      }
-      continue;
-    }
-
-    if (inTemplate) {
-      if (ch === '`') {
-        inTemplate = false;
-      }
-      continue;
-    }
-
-    if (ch === '/' && next === '/') {
-      inLineComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === '/' && next === '*') {
-      inBlockComment = true;
-      i += 1;
-      continue;
-    }
-
-    if (ch === "'") {
-      inSingle = true;
-      continue;
-    }
-
-    if (ch === '"') {
-      inDouble = true;
-      continue;
-    }
-
-    if (ch === '`') {
-      inTemplate = true;
-      continue;
-    }
-
-    if (ch === '{') {
-      depth += 1;
-      continue;
-    }
-
-    if (ch === '}') {
-      depth -= 1;
-      continue;
-    }
-
-    if (depth !== 1) {
-      continue;
-    }
-
-    const rest = objectText.slice(i);
-    const propertyMatch = rest.match(/^([A-Za-z_$][\w$]*)\s*:/);
-    if (propertyMatch) {
-      names.add(propertyMatch[1]);
-      i += propertyMatch[0].length - 1;
+    const name = property.name;
+    if (
+      name &&
+      (ts.isIdentifier(name) ||
+        ts.isStringLiteral(name) ||
+        ts.isNumericLiteral(name))
+    ) {
+      names.add(name.text);
     }
   }
 
-  return names;
+  return { names };
 }
 
 /**

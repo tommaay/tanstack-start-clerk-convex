@@ -2,32 +2,25 @@
  * Tests for Convex validator scans (args + returns on registered functions).
  */
 import { describe, expect, it } from 'vitest';
-import {
-  findNextObjectBraceIndex,
-  getTopLevelPropertyNames,
-  scanConvexValidators,
-} from './check-convex-returns.mjs';
+import { scanConvexValidators } from './check-convex-returns.mjs';
 
-describe('getTopLevelPropertyNames', () => {
-  it('reads top-level keys and ignores nested handler properties', () => {
-    const names = getTopLevelPropertyNames({
-      objectText: `{
-  args: {},
-  returns: v.null(),
-  handler: async () => {
-    const note = "returns: fake";
-    // args: fake
-    return null;
-  },
-}`,
-    });
-
-    expect(names.has('args')).toBe(true);
-    expect(names.has('returns')).toBe(true);
-    expect(names.has('handler')).toBe(true);
-    expect(names.has('fake')).toBe(false);
+/**
+ * Scan a snippet and report which validators it flags.
+ *
+ * @param {string} contents Convex module source
+ * @returns {{ args: boolean; returns: boolean; lines: number[] }}
+ */
+function flagsFor(contents) {
+  const { findings } = scanConvexValidators({
+    relativePath: 'convex/example.ts',
+    contents,
   });
-});
+  return {
+    args: findings.some((finding) => finding.message.includes('args')),
+    returns: findings.some((finding) => finding.message.includes('returns')),
+    lines: findings.map((finding) => finding.line),
+  };
+}
 
 describe('scanConvexValidators', () => {
   it('passes when args and returns are present', () => {
@@ -43,142 +36,154 @@ describe('scanConvexValidators', () => {
     expect(findings).toEqual([]);
   });
 
-  it('flags missing returns', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = query({
+  it('flags missing returns with the registrar line', () => {
+    const result = flagsFor(`import { v } from 'convex/values';
+
+export const list = query({
   args: {},
   handler: async () => [],
 });
-`,
-    });
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+`);
+    expect(result).toEqual({ args: false, returns: true, lines: [3] });
   });
 
   it('flags missing args', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = internalMutation({
+    expect(
+      flagsFor(`export const list = internalMutation({
   returns: v.null(),
   handler: async () => null,
 });
-`,
-    });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
+`).args,
+    ).toBe(true);
   });
 
   it('flags missing validators when a comment contains an unmatched brace', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = query({
+    const result = flagsFor(`export const list = query({
   // {
   handler: async () => null,
 });
-`,
-    });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
   });
 
   it('flags missing validators when a block comment precedes the object', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = query(/* { */ {
+    const result = flagsFor(`export const list = query(/* { */ {
   handler: async () => null,
 });
-`,
-    });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
   });
 
   it('flags missing validators when a registrar comment precedes the call', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = mutation /* note */ ({
+    const result = flagsFor(`export const list = mutation /* note */ ({
   handler: async () => null,
 });
-`,
-    });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
   });
 
   it('flags missing validators for function-form registrars', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = mutation(async () => ({
+    const result = flagsFor(`export const list = mutation(async () => ({
   handler: async () => null,
 }));
-`,
-    });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
   });
 
   it('flags missing validators for direct callback function-form registrars', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = mutation(async (ctx, args) => {
+    const result = flagsFor(`export const list = mutation(async (ctx, args) => {
   return null;
 });
-`,
-    });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
   });
 
   it('ignores args and returns tokens in comments and strings', () => {
-    const { findings } = scanConvexValidators({
-      relativePath: 'convex/example.ts',
-      contents: `export const list = query({
+    const result = flagsFor(`export const list = query({
   // args: required
   handler: async () => {
     const note = "returns: v.null()";
     return null;
   },
 });
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
+  });
+
+  it('flags missing returns when the handler contains a regex literal with braces', () => {
+    const result = flagsFor(`export const isCode = query({
+  args: { value: v.string() },
+  handler: async (_ctx, args) => /^\\d{3}-\\d{2}$/.test(args.value),
+});
+`);
+    expect(result).toEqual({ args: false, returns: true, lines: [1] });
+  });
+
+  it('passes when a regex literal with braces sits next to both validators', () => {
+    const { findings } = scanConvexValidators({
+      relativePath: 'convex/example.ts',
+      contents: `export const isCode = query({
+  args: { value: v.string() },
+  returns: v.boolean(),
+  handler: async (_ctx, args) => /[{']/.test(args.value) && /\\d{3}/.test(args.value),
+});
 `,
     });
-    expect(findings.some((finding) => finding.message.includes('args'))).toBe(
-      true,
-    );
-    expect(
-      findings.some((finding) => finding.message.includes('returns')),
-    ).toBe(true);
+    expect(findings).toEqual([]);
   });
-});
 
-describe('findNextObjectBraceIndex', () => {
-  it('skips braces inside block comments', () => {
-    const index = findNextObjectBraceIndex({
-      contents: 'query(/* { */ { handler: true })',
-      startIndex: 0,
+  it('flags missing returns when a template literal contains braces and backticks', () => {
+    /** Source text of a template placeholder, built so the test itself has none. */
+    const placeholder = (expr) => ['$', '{', expr, '}'].join('');
+    const result = flagsFor(`export const greet = mutation({
+  args: { name: v.string() },
+  handler: async (_ctx, args) => \`Hi ${placeholder('args.name')} {${placeholder('`nested`')}}\`,
+});
+`);
+    expect(result).toEqual({ args: false, returns: true, lines: [1] });
+  });
+
+  it('does not treat a nested handler property as a top-level validator', () => {
+    const result = flagsFor(`export const list = query({
+  handler: async () => ({ args: {}, returns: null }),
+});
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
+  });
+
+  it('flags validators hidden behind a spread as missing', () => {
+    const result = flagsFor(`export const list = query({
+  ...shared,
+  handler: async () => null,
+});
+`);
+    expect(result.args).toBe(true);
+    expect(result.returns).toBe(true);
+  });
+
+  it('ignores non-exported and non-registrar calls', () => {
+    const { findings } = scanConvexValidators({
+      relativePath: 'convex/example.ts',
+      contents: `const helper = query({ handler: async () => null });
+export const wrapped = authedQuery({ handler: async () => null });
+export const value = compute({ handler: 1 });
+`,
     });
-    expect(index).toBe('query(/* { */ { handler: true })'.indexOf('{ handler'));
+    expect(findings).toEqual([]);
+  });
+
+  it('skips generated files', () => {
+    const { findings } = scanConvexValidators({
+      relativePath: 'convex/_generated/api.ts',
+      contents: 'export const list = query({ handler: async () => null });\n',
+    });
+    expect(findings).toEqual([]);
   });
 });
