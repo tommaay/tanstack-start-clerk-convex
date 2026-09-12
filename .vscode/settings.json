@@ -1,0 +1,29 @@
+{
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[javascript]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[json]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[jsonc]": { "editor.defaultFormatter": "biomejs.biome" },
+  "[css]": { "editor.defaultFormatter": "biomejs.biome" },
+  "eslint.validate": ["typescript"],
+  "eslint.workingDirectories": ["."],
+  "files.readonlyInclude": {
+    "**/src/routeTree.gen.ts": true,
+    "**/convex/_generated/**": true,
+    "**/AGENTS.md": true,
+    "**/CLAUDE.md": true
+  },
+  "files.watcherExclude": {
+    "**/src/routeTree.gen.ts": true
+  },
+  "search.exclude": {
+    "**/src/routeTree.gen.ts": true,
+    "**/convex/_generated/**": true
+  }
+}

@@ -1,0 +1,26 @@
+# Fast local gate on staged files. CI runs the full `pnpm check`.
+# Biome Lefthook recipe: https://biomejs.dev/recipes/git-hooks/
+# doublestar: Lefthook's default matcher does not treat `{a,b}/**` like
+# lint-staged does; brace globs skipped `src/` files in Lefthook 2.1.x.
+# Source: https://github.com/evilmartians/lefthook/blob/master/docs/configuration/glob_matcher.md
+glob_matcher: doublestar
+
+pre-commit:
+  parallel: false
+  commands:
+    biome:
+      glob: "**/*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc,css}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
+      stage_fixed: true
+    eslint-convex:
+      glob: "convex/**/*.{js,ts}"
+      run: pnpm exec eslint convex
+    hard-rails:
+      glob:
+        - "src/**/*.{js,ts,tsx,jsx,mjs}"
+        - "convex/**/*.{js,ts,tsx,jsx,mjs}"
+        - "scripts/**/*.{js,ts,tsx,jsx,mjs}"
+      run: node scripts/check-convex-returns.mjs && node scripts/check-hard-rails.mjs
+    agent-docs:
+      glob: "**/INSTRUCTIONS.md"
+      run: pnpm agents:sync && git add AGENTS.md CLAUDE.md
