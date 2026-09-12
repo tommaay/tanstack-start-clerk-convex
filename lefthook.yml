@@ -23,4 +23,6 @@ pre-commit:
       run: node scripts/check-convex-returns.mjs && node scripts/check-hard-rails.mjs
     agent-docs:
       glob: "**/INSTRUCTIONS.md"
-      run: pnpm agents:sync && git add AGENTS.md CLAUDE.md
+      # `:(glob)` makes `**/` match the root pair and every nested sibling
+      # (a plain `**/AGENTS.md` pathspec skips the root file).
+      run: pnpm agents:sync && git add ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md'
