@@ -57,6 +57,8 @@ describe('scanSourceFile', () => {
 
   it.each([
     ['relative import', "import { requireEnv } from '../utils/env';\n"],
+    ['side-effect import', "import '~/utils/logger';\n"],
+    ['side-effect import with double quotes', 'import "../utils/env.ts";\n'],
     ['dynamic import', "const { logger } = await import('~/utils/logger');\n"],
     ['require', "const { logger } = require('~/utils/logger');\n"],
   ])('flags a %s of a server-only module from src/lib', (_label, contents) => {

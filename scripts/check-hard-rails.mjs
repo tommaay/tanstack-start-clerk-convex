@@ -21,9 +21,12 @@ const SKIP_FILES = new Set(['src/routeTree.gen.ts']);
 const SOURCE_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs']);
 const HISTORY_COMMENT_RE =
   /(?:\/\/|\/\*|\*(?!\/)|\*\/)\s*(?:.*\b(?:do not|don't|never|Do not|Never)\b.*\bbecause\b)/i;
-/** Static `from "…"`, dynamic `import("…")`, and `require("…")` of a server-only module. */
+/**
+ * Static `from "…"`, side-effect `import "…"`, dynamic `import("…")`, and
+ * `require("…")` of a server-only module.
+ */
 const SERVER_ONLY_IMPORT_RE =
-  /(?:\bfrom\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:~\/utils\/(?:logger|env)|(?:\.\.?\/)+utils\/(?:logger|env))(?:\.ts)?["']/;
+  /(?:\bfrom\s+|\bimport\s+|\bimport\s*\(\s*|\brequire\s*\(\s*)["'](?:~\/utils\/(?:logger|env)|(?:\.\.?\/)+utils\/(?:logger|env))(?:\.ts)?["']/;
 const CLIENT_ONLY_PREFIXES = ['src/components/', 'src/lib/'];
 
 /**
