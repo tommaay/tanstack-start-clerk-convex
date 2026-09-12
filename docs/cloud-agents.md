@@ -56,5 +56,6 @@ Cursor Secrets (cloud agents) / repository secrets (GitHub Actions):
 - Caches `~/.cache/convex` (local backend binary).
 - Sets `CLERK_JWT_ISSUER_DOMAIN` on the anonymous deployment, then
   `pnpm check:core`.
-- Runs Playwright only when `CLERK_SECRET_KEY` is present; otherwise emits a
-  workflow warning. Uploads `playwright-report` on failure.
+- Runs Playwright only when both `CLERK_PUBLISHABLE_KEY` and
+  `CLERK_SECRET_KEY` are present; otherwise emits a workflow warning. Uploads
+  `playwright-report` on failure.
