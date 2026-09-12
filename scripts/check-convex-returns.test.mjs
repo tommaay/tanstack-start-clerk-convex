@@ -183,6 +183,55 @@ export const list = query({
     expect(result.returns).toBe(true);
   });
 
+  it('flags a default-exported registrar call', () => {
+    const result = flagsFor(`import { query } from './_generated/server';
+
+export default query({ handler: async () => null });
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [3, 3] });
+  });
+
+  it('passes a default-exported registrar call with both validators', () => {
+    const result = flagsFor(`export default query({
+  args: {},
+  returns: v.null(),
+  handler: async () => null,
+});
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
+  it.each([
+    ['export default name', 'export default list;\n'],
+    ['export { name }', 'export { list };\n'],
+    ['export { name as other }', 'export { list as fetchAll };\n'],
+    ['export { name as default }', 'export { list as default };\n'],
+  ])('flags a local registrar exported through %s', (_label, exportLine) => {
+    const result = flagsFor(
+      `const list = query({ handler: async () => null });\n\n${exportLine}`,
+    );
+    expect(result).toEqual({ args: true, returns: true, lines: [1, 1] });
+  });
+
+  it('reports a registrar once when it is exported twice', () => {
+    const result =
+      flagsFor(`export const list = query({ handler: async () => null });
+
+export default list;
+`);
+    expect(result.lines).toEqual([1, 1]);
+  });
+
+  it('ignores re-exports from other modules and locals that stay private', () => {
+    const result =
+      flagsFor(`const hidden = query({ handler: async () => null });
+
+export { list } from './posts';
+export const other = 1;
+`);
+    expect(result).toEqual({ args: false, returns: false, lines: [] });
+  });
+
   it('ignores non-exported and non-registrar calls', () => {
     const { findings } = scanConvexValidators({
       relativePath: 'convex/example.ts',

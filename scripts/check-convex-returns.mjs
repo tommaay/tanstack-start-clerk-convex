@@ -48,7 +48,11 @@ const MISSING_RETURNS = 'Convex function is missing a `returns` validator.';
 /**
  * Scan one Convex source file for missing args or returns on registered functions.
  *
- * A registered function is `export const name = <registrar>(...)`. The options
+ * Convex registers every exported binding whose value is `<registrar>(...)`
+ * (a default export maps to the module path, see `server/api.js`). The scan
+ * therefore covers `export const name = query(...)`,
+ * `export default query(...)`, and locals exported later through
+ * `export default name` or `export { name, name as other }`. The options
  * must be an inline object literal; any other first argument (a handler
  * callback, a variable) reports both validators as missing.
  *
@@ -72,27 +76,75 @@ export function scanConvexValidators({ relativePath, contents }) {
     SCRIPT_KIND_BY_EXTENSION.get(extname(normalized)) ?? ts.ScriptKind.TS,
   );
 
+  /**
+   * Top-level `name = <registrar>(...)` declarations, exported or not, so a
+   * later `export { name }` / `export default name` can be traced back.
+   * @type {Map<string, { call: import('typescript').CallExpression; node: import('typescript').Node }>}
+   */
+  const localRegistrars = new Map();
   for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement) || !isExported(statement)) {
+    if (!ts.isVariableStatement(statement)) {
       continue;
     }
-
     for (const declaration of statement.declarationList.declarations) {
       const call = declaration.initializer;
-      if (!call || !isRegistrarCall(call)) {
-        continue;
+      if (call && ts.isIdentifier(declaration.name) && isRegistrarCall(call)) {
+        localRegistrars.set(declaration.name.text, { call, node: statement });
       }
+    }
+  }
 
-      const line =
-        sourceFile.getLineAndCharacterOfPosition(statement.getStart(sourceFile))
-          .line + 1;
-      const { names } = getOptionsPropertyNames({ call });
+  /** Calls already reported, so a double export does not double-report. */
+  const checked = new Set();
+  /**
+   * @param {{ call: import('typescript').CallExpression; node: import('typescript').Node }} params
+   */
+  const check = ({ call, node }) => {
+    if (checked.has(call)) {
+      return;
+    }
+    checked.add(call);
+    const line =
+      sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line +
+      1;
+    const { names } = getOptionsPropertyNames({ call });
+    if (!names.has('args')) {
+      findings.push({ file: normalized, line, message: MISSING_ARGS });
+    }
+    if (!names.has('returns')) {
+      findings.push({ file: normalized, line, message: MISSING_RETURNS });
+    }
+  };
+  /** @param {string} name Local binding name */
+  const checkLocal = (name) => {
+    const entry = localRegistrars.get(name);
+    if (entry) {
+      check(entry);
+    }
+  };
 
-      if (!names.has('args')) {
-        findings.push({ file: normalized, line, message: MISSING_ARGS });
+  for (const statement of sourceFile.statements) {
+    if (ts.isVariableStatement(statement) && isExported(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        const call = declaration.initializer;
+        if (call && isRegistrarCall(call)) {
+          check({ call, node: statement });
+        }
       }
-      if (!names.has('returns')) {
-        findings.push({ file: normalized, line, message: MISSING_RETURNS });
+    } else if (ts.isExportAssignment(statement) && !statement.isExportEquals) {
+      if (isRegistrarCall(statement.expression)) {
+        check({ call: statement.expression, node: statement });
+      } else if (ts.isIdentifier(statement.expression)) {
+        checkLocal(statement.expression.text);
+      }
+    } else if (
+      ts.isExportDeclaration(statement) &&
+      !statement.moduleSpecifier &&
+      statement.exportClause &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      for (const element of statement.exportClause.elements) {
+        checkLocal((element.propertyName ?? element.name).text);
       }
     }
   }
