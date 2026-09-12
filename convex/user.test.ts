@@ -34,4 +34,15 @@ describe('user.profile', () => {
       pictureUrl: 'https://img.clerk.com/avatar.png',
     });
   });
+
+  it('passes return validation when Clerk omits the optional claims', async () => {
+    const t = convexTest({ schema, modules });
+    const asUser = t.withIdentity({ subject: 'user_456' });
+
+    // Optional validators accept `undefined` fields, and the Convex runtime
+    // drops them in `convexToJson` before the backend validates the result.
+    expect(await asUser.query(api.user.profile, {})).toEqual({
+      subject: 'user_456',
+    });
+  });
 });
