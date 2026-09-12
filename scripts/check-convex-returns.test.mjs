@@ -332,6 +332,21 @@ export const list = helpers.query({ handler: async () => null });
     expect(result).toEqual({ args: false, returns: false, lines: [] });
   });
 
+  it('flags a registrar assigned after declaration and exported by name', () => {
+    const result = flagsFor(`let list;
+list = query({ handler: async () => null });
+export { list };
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [2, 2] });
+  });
+
+  it('flags a registrar assigned to an exported let binding', () => {
+    const result = flagsFor(`export let list;
+list = query({ handler: async () => null });
+`);
+    expect(result).toEqual({ args: true, returns: true, lines: [2, 2] });
+  });
+
   it('reports a registrar once when it is exported twice', () => {
     const result =
       flagsFor(`export const list = query({ handler: async () => null });

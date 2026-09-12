@@ -86,33 +86,52 @@ export function scanConvexValidators({ relativePath, contents }) {
   const { registrars } = getRegistrars({ sourceFile });
 
   /**
-   * Top-level `name = <registrar>(...)` declarations, exported or not, plus
-   * `other = name` aliases of them, so a later `export { name }`,
-   * `export default name`, or `export const x = name` can be traced back.
+   * Top-level bindings that hold `<registrar>(...)`, exported or not, from
+   * declarations (`const name = query(...)`), later assignments
+   * (`let name; name = query(...)`), and `other = name` aliases of them, so
+   * `export { name }`, `export default name`, `export const x = name` and
+   * `export let name` can be traced back to the call.
    * @type {Map<string, { call: import('typescript').CallExpression; node: import('typescript').Node }>}
    */
   const localRegistrars = new Map();
-  for (const statement of sourceFile.statements) {
-    if (!ts.isVariableStatement(statement)) {
-      continue;
-    }
-    for (const declaration of statement.declarationList.declarations) {
-      const initializer = declaration.initializer;
-      if (!initializer || !ts.isIdentifier(declaration.name)) {
-        continue;
+  /**
+   * @param {{ name: string; value: import('typescript').Expression; node: import('typescript').Node }} params
+   *   Binding name, the expression stored in it, and the statement for line numbers
+   */
+  const recordLocal = ({ name, value, node }) => {
+    const { call } = getRegistrarCall({ expression: value, registrars });
+    if (call) {
+      localRegistrars.set(name, { call, node });
+    } else if (ts.isIdentifier(value)) {
+      const aliased = localRegistrars.get(value.text);
+      if (aliased) {
+        localRegistrars.set(name, aliased);
       }
-      const { call } = getRegistrarCall({
-        expression: initializer,
-        registrars,
-      });
-      if (call) {
-        localRegistrars.set(declaration.name.text, { call, node: statement });
-      } else if (ts.isIdentifier(initializer)) {
-        const aliased = localRegistrars.get(initializer.text);
-        if (aliased) {
-          localRegistrars.set(declaration.name.text, aliased);
+    }
+  };
+  for (const statement of sourceFile.statements) {
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (declaration.initializer && ts.isIdentifier(declaration.name)) {
+          recordLocal({
+            name: declaration.name.text,
+            value: declaration.initializer,
+            node: statement,
+          });
         }
       }
+    } else if (
+      ts.isExpressionStatement(statement) &&
+      ts.isBinaryExpression(statement.expression) &&
+      statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isIdentifier(statement.expression.left)
+    ) {
+      // `name = query(...)` after `let name;`
+      recordLocal({
+        name: statement.expression.left.text,
+        value: statement.expression.right,
+        node: statement,
+      });
     }
   }
 
@@ -150,6 +169,10 @@ export function scanConvexValidators({ relativePath, contents }) {
       for (const declaration of statement.declarationList.declarations) {
         const initializer = declaration.initializer;
         if (!initializer) {
+          // `export let name;` filled by a later `name = query(...)`.
+          if (ts.isIdentifier(declaration.name)) {
+            checkLocal(declaration.name.text);
+          }
           continue;
         }
         const { call } = getRegistrarCall({
