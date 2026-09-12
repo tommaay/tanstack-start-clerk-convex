@@ -76,12 +76,16 @@ fi
 #    at a foreign deployment. Limit: every CONVEX_AGENT_MODE=anonymous checkout
 #    is named `anonymous-agent` by the CLI, so two agent-mode checkouts on one
 #    machine cannot be told apart here (nor by the CLI).
-if curl -sf -o /dev/null http://127.0.0.1:3210/version; then
+#    Both probes carry timeouts: a socket that accepts but never answers must
+#    not hang the install; it falls through to the deploy path, where the CLI
+#    reports the port conflict itself.
+CURL_PROBE=(curl -sf --connect-timeout 2 --max-time 5)
+if "${CURL_PROBE[@]}" -o /dev/null http://127.0.0.1:3210/version; then
   expected=""
   if [ -f .env.local ]; then
     expected="$(awk -F'[=:]' '/^CONVEX_DEPLOYMENT=/ { print $NF; exit }' .env.local)"
   fi
-  running="$(curl -sf http://127.0.0.1:3210/instance_name || true)"
+  running="$("${CURL_PROBE[@]}" http://127.0.0.1:3210/instance_name || true)"
   if [ -z "$expected" ] || [ "$running" != "$expected" ]; then
     echo "ERROR: port 3210 serves Convex backend '${running:-unknown}', but this checkout expects '${expected:-none (no CONVEX_DEPLOYMENT in .env.local)}'. Stop that backend and re-run this script." >&2
     exit 1
