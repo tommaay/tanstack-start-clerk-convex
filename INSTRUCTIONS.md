@@ -41,7 +41,7 @@ Full-stack React starter: **TanStack Start** (SSR, file routes, Vite 8) + **Cler
 ## Pull requests
 
 - **Never a draft:** open PRs **ready for review**. Create a draft only when the user asks for one
-- **Atomic scope:** one route **or** one Convex function group **or** one schema change per PR
+- **Atomic scope:** one route **or** one Convex function group **or** one schema change **or** one docs / skills / tooling change per PR
 - **Before review:** run `pnpm check` on the PR branch. CI is the hard gate — do not request review with a red check
 - **Self-review before `gh pr create`:** run the `review-code` skill (`.agents/skills/review-code/`) in diff mode (`git diff main...HEAD`) on the branch. Fix every 🔴 and 🟡 finding, or list each unfixed one with a reason under **Not verified** in the PR body. Only then open the PR ready for review. Policy, not a rail — CI stays the hard gate
 - **PR body — verification:** state what you verified and what you did **not** verify. Copy the checklist from [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)

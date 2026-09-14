@@ -51,7 +51,7 @@ The author names a question, a flow, or a file set ("does the profile query hand
 
 ## Output
 
-Start with scope and verdict: `Review (diff PR #N): N findings` / `Review (full repo): N findings` / `all clear`.
+Start with scope and verdict: `Review (diff PR #N): N findings` / `Review (diff branch <name>): N findings` / `Review (full repo): N findings` / `all clear`.
 
 Group findings by checklist area (UI & Routes, Convex & Server, Accessibility, Docs & Agent Brief, PR Scope, Other). Within a group order by severity:
 
