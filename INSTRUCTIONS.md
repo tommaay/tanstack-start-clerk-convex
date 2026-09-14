@@ -46,6 +46,7 @@ Full-stack React starter: **TanStack Start** (SSR, file routes, Vite 8) + **Cler
 - **PR body — verification:** state what you verified and what you did **not** verify. Copy the checklist from [.github/PULL_REQUEST_TEMPLATE.md](.github/PULL_REQUEST_TEMPLATE.md)
 - **Signed-in flows:** say **signed-in e2e was not run** unless `E2E_CLERK_USER_EMAIL` was set for `pnpm test:e2e`
 - **Soft review (optional):** Bugbot / CodeRabbit on PRs is allowed. It does not replace `pnpm check`
+- **Macroscope:** review agents live in `.macroscope/check-run-agents/` (one file per check run, `conclusion: neutral`); correctness context in `.macroscope/correctness/`. They import `AGENTS.md` and `docs/` with `@/path`, so keep rules there, not in the agent files
 
 ## Cloud agents
 
