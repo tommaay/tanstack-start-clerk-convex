@@ -46,6 +46,10 @@ Cursor Secrets (cloud agents) / repository secrets (GitHub Actions):
 2. Terminals — `convex` (anonymous watcher) and `vite` (`pnpm dev:web`).
 3. Agent runs `pnpm check` before opening a PR. Without
    `E2E_CLERK_USER_EMAIL` the signed-in project is skipped; say so in the PR.
+4. Agent runs the `review-code` skill (`.agents/skills/review-code/`) in diff
+   mode on the branch before `gh pr create`. Fix every 🔴 and 🟡 finding, or
+   list each unfixed one with a reason under **Not verified** in the PR body.
+   Open the PR ready for review only after that.
 
 ## GitHub Actions
 

@@ -65,8 +65,9 @@ You review the files that steer coding agents in this repo: the agent brief, the
 
 ### Skills
 
-- `.agents/skills/**` is vendored from `get-convex/agent-skills` and pinned in `skills-lock.json`. Flag a hand edit to a skill file that leaves `skills-lock.json` unchanged; the fix is to re-install the skill from its source, not to edit it in place.
+- Skills listed in `skills-lock.json` are vendored from `get-convex/agent-skills`. Flag a hand edit to a **locked** skill file that leaves `skills-lock.json` unchanged; the fix is to re-install the skill from its source, not to edit it in place. Skills that are not in the lock (`review-code`) are hand-written in this repo; review them like docs.
 - Each skill folder has a `SKILL.md` with YAML front matter `name` and `description`, and `name` equals the folder name.
+- `.agents/skills/review-code/SKILL.md` lists the `.macroscope/check-run-agents/` files in a table. Flag a listed file that does not exist and a check-run file that is not listed.
 
 ### CI, hooks, and cloud agents
 
