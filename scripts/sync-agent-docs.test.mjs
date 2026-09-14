@@ -98,12 +98,12 @@ describe('syncAgentDocs', () => {
     const root = await makeTempRoot();
     await writeFile(
       join(root, 'INSTRUCTIONS.md'),
-      '# Polaristarter\n\nNew body.\n',
+      '# Brief\n\nNew body.\n',
       'utf8',
     );
     await writeFile(
       join(root, 'AGENTS.md'),
-      `# Generated from INSTRUCTIONS.md. Do not edit. Run pnpm agents:sync\n\n# Polaristarter\n\nOld body.\n\n${CONVEX_AI_BLOCK}\n`,
+      `# Generated from INSTRUCTIONS.md. Do not edit. Run pnpm agents:sync\n\n# Brief\n\nOld body.\n\n${CONVEX_AI_BLOCK}\n`,
       'utf8',
     );
     await writeFile(
@@ -128,7 +128,7 @@ describe('syncAgentDocs', () => {
     const root = await makeTempRoot();
     await writeFile(
       join(root, 'INSTRUCTIONS.md'),
-      `# Polaristarter\n\nHello.\n\n${CONVEX_AI_BLOCK}\n`,
+      `# Brief\n\nHello.\n\n${CONVEX_AI_BLOCK}\n`,
       'utf8',
     );
 
