@@ -276,6 +276,20 @@ async function main() {
     );
     process.exit(2);
   }
+  if (flags['sign-in'] && !flags['clerk-testing-token']) {
+    err('drive: --sign-in needs --clerk-testing-token');
+    process.exit(2);
+  }
+  if (flags['clerk-testing-token']) {
+    loadClerkEnv();
+    if (!process.env.CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
+      err(
+        'drive: --clerk-testing-token needs CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY',
+      );
+      process.exit(2);
+    }
+  }
+
   const artifactsDir =
     process.env.ARTIFACTS_DIR ??
     state.ARTIFACTS_DIR ??
@@ -289,13 +303,6 @@ async function main() {
 
   let clerkTesting = null;
   if (flags['clerk-testing-token']) {
-    loadClerkEnv();
-    if (!process.env.CLERK_PUBLISHABLE_KEY || !process.env.CLERK_SECRET_KEY) {
-      err(
-        'drive: --clerk-testing-token needs CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY',
-      );
-      process.exit(2);
-    }
     clerkTesting = await import('@clerk/testing/playwright');
     await clerkTesting.clerkSetup();
   }
