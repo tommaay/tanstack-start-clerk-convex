@@ -71,5 +71,6 @@ The repo's Playwright suite covers the same gate: `E2E_PORT=3123 pnpm test:e2e -
 - Typing an email into the modal and pressing `Continue` reaches Clerk's hosted verification (code by email); never drive that. Use `--clerk-testing-token --sign-in`, the path `e2e/global.setup.ts` uses.
 - The modal and the inline `SignIn` share `.cl-rootBox`; use `role=dialog` to tell the modal apart.
 - Protected routes answer HTTP 500 while signed out even though the UI is correct. `expect-status 500` is the expected value; a 200 there would mean the gate did not fire.
+- The `console.log` artifact for a signed-out `/dashboard` or `/user` contains `[error] Failed to load resource: … 500`, a React `[error] %o … Error: Not authenticated … The above error occurred in the <MatchInnerImpl> component`, and `[warning] Warning: Error in route match: /_authed/`. All three are the gate firing (`_authed.tsx` throws on purpose), not new failures; `/` and `/posts` log no errors.
 - Do not assert the Clerk heading text (`Sign in to <app name>`): it is the Clerk application name, `My Application` in keyless mode.
-- The avatar trigger's accessible name depends on whether the avatar image loaded (full name from `alt`) or the initials fallback rendered; target `css=[data-slot="dropdown-menu-trigger"]`.
+- The avatar trigger's accessible name depends on whether the avatar image loaded (`alt` = full name, or `User` when Clerk has no name) or the initials fallback rendered; target `css=[data-slot="dropdown-menu-trigger"]`.

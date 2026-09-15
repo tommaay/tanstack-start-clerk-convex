@@ -1,6 +1,6 @@
 # Posts
 
-The posts page (`/posts`) lists every row of the Convex `posts` table as a card (title + body), oldest first, rendered on the server and kept live over the Convex WebSocket. When the table is empty it shows `No posts yet. Use “Populate posts” to seed some from Convex.` and a `Populate posts` button that runs the Convex action `posts:populate`: it fetches ten sample posts from `https://jsonplaceholder.typicode.com/posts`, inserts them, shows the toast `Posts populated`, and the button disappears once the list is non-empty. Public: no sign-in needed.
+The posts page (`/posts`) lists every row of the Convex `posts` table as a card (title + body), oldest first, rendered on the server and kept live over the Convex WebSocket. When the table is empty it shows `No posts yet. Use “Populate posts” to seed some from Convex.` and a `Populate posts` button that runs the Convex action `posts:populate`: it fetches the sample posts from `https://jsonplaceholder.typicode.com/posts`, inserts the first ten, shows the toast `Posts populated`, and the button disappears once the list is non-empty. Public: no sign-in needed.
 
 ## Sub-features
 
@@ -59,6 +59,6 @@ node .cursor/skills/verify-starter/bin/drive.mjs --feature posts \
 - Clicking `Populate posts` before hydration does nothing: the SSR button has no handler yet and no toast appears. Always `wait-convex` first.
 - The action is idempotent: when rows exist it returns without inserting, so a second run cannot be "proven" by re-clicking. Reset the table first.
 - `posts:populate` needs egress from the **Convex backend** (local process in anonymous mode, Convex cloud otherwise), not from the browser. A sandbox that blocks it yields `Could not populate posts`.
-- Data persists in `.convex/local/<deployment>/` across backend restarts; a non-empty table hides the button and the empty state on the next run.
-- The list is sorted by `_creationTime`; the ten inserts run in parallel, so card order is not the JSONPlaceholder id order. Assert count, not order.
+- Data persists in `.convex/local/` (observed: `.convex/local/default/`) across backend restarts; a non-empty table hides the button and the empty state on the next run.
+- The list is sorted by `_creationTime`; the ten inserts run in parallel (`Promise.all`), so card order is not guaranteed to be the JSONPlaceholder id order even though it often is. Assert count, not order.
 - Toasts auto-dismiss after a few seconds; assert `Posts populated` right after the click, before the card count.
