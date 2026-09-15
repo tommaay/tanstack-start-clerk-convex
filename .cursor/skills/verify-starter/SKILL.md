@@ -16,7 +16,7 @@ Detected by `bin/launch.sh` and shown by `bin/doctor.sh`:
 | Dimension | Value | How it is detected | Consequence |
 | --- | --- | --- | --- |
 | Clerk | `keys` | `CLERK_PUBLISHABLE_KEY` + `CLERK_SECRET_KEY` in the shell env or `.env` | Sign-in via Testing Token works (`--clerk-testing-token`, `--sign-in`). Dashboard/Account verifiable when the Clerk instance has a JWT template named `convex` **and** `CLERK_JWT_ISSUER_DOMAIN` on the Convex deployment is that template's issuer. |
-| Clerk | `keyless` | both keys blank/missing | `@clerk/tanstack-react-start` starts in keyless mode, creates a temporary Clerk app and writes `.clerk/.tmp/keyless.json` (untracked, contains an `sk_test_` key: never commit it). Signed-out surfaces work. Signing in breaks every page with `Something went wrong` (`Not Found`) because the temp instance has no `convex` JWT template. |
+| Clerk | `keyless` | both keys blank/missing | `@clerk/tanstack-react-start` starts in keyless mode, creates a temporary Clerk app and writes `.clerk/.tmp/keyless.json` (untracked, contains an `sk_test_` key: never commit it). Signed-out surfaces work. Signing in breaks every page with `Something went wrong` (`Not Found`) because the temp instance has no `convex` JWT template. While `.clerk/` exists, `pnpm format:check` (so `pnpm check` / `check:core`) fails on `.clerk/.tmp/keyless.json`, which `.gitignore` does not cover: run `bin/cleanup.sh` (it removes the directory this run created) before `pnpm check`. |
 | Convex | `anonymous` | `.env.local` has `CONVEX_DEPLOYMENT=anonymous:<name>` | Launch starts/reuses the local backend on :3210. `convex` CLI calls need `CONVEX_AGENT_MODE=anonymous` (the helpers add it). |
 | Convex | `cloud` | any other `CONVEX_DEPLOYMENT` | Nothing to start locally; `convex run` targets the remote deployment. Not exercised while this skill was generated. |
 
@@ -78,7 +78,7 @@ Steps: `goto <path>`, `wait-convex`, `wait-idle`, `click <locator>`, `fill <loca
 
 Stable handles in this app (from `src/routes/**` and `src/components/**`):
 
-- Nav: `role=link name="Start · Clerk · Convex"`, `role=link name=Home`, `role=link name=Posts exact` (plain `name=Posts` also matches `Browse posts`), `role=link name=Dashboard` (signed-in only), `role=button name="Sign in"` (signed-out only), avatar menu trigger `css=[data-slot="dropdown-menu-trigger"]` (signed-in only; its accessible name is the avatar `alt`, the user's full name, or the initials fallback when the image does not load, so do not rely on the name), menu items `role=menuitem name=Dashboard` / `name=Account` / `name="Sign out"`.
+- Nav: `role=link name="Start · Clerk · Convex"`, `role=link name=Home`, `role=link name=Posts exact` (plain `name=Posts` also matches `Browse posts`), `role=link name=Dashboard` (signed-in only), `role=button name="Sign in"` (signed-out only), avatar menu trigger `css=[data-slot="dropdown-menu-trigger"]` (signed-in only; its accessible name is the avatar `alt` (the user's full name, or `User` when Clerk has no name) or the initials fallback when the image does not load, so do not rely on the name), menu items `role=menuitem name=Dashboard` / `name=Account` / `name="Sign out"`.
 - Home: `text="TanStack Start + Clerk + Convex" exact`, `role=button name="Get started"`, `role=link name="Browse posts"`, `role=link name="Go to dashboard"` (signed-in).
 - Posts: `role=heading name=Posts`, `role=button name="Populate posts"` (only while the table is empty; label `Populating…` while running), empty state `text="No posts yet."`, cards `css=[data-slot="card-title"]`, toast `text="Posts populated"` / `text="Could not populate posts"`.
 - Clerk UI: `.cl-rootBox` (every prebuilt component root), modal `role=dialog` with `role=button name="Close modal"`, `role=textbox name="Email address"`, `role=button name=Continue exact` (`Continue with Google` also matches without `exact`). The heading reads `Sign in to <Clerk app name>` (`My Application` in keyless mode) so do not assert it.
@@ -133,7 +133,7 @@ Proof standards:
 
 Kills the Vite process group and, only if this run started it, the Convex process group, both by recorded PID (never by name). Leaves a reused Convex backend and any foreign listener alone (warns). Removes `.clerk/` only when keyless mode created it during this run. Copies `vite.log`, `convex.log`, `state.env` into the evidence directory, then deletes `/tmp/verify-starter/run`. Never touches `/tmp/verify-starter/artifacts`. Run it after every failed attempt too, then relaunch.
 
-Fixture residue is separate from instances: if a drive populated posts, `bin/backend.sh posts-reset` restores the empty table (data lives in `.convex/local/<deployment>/` for anonymous backends and survives restarts).
+Fixture residue is separate from instances: if a drive populated posts, `bin/backend.sh posts-reset` restores the empty table (data lives under `.convex/local/` for anonymous backends, `.convex/local/default/` as observed, and survives restarts).
 
 ## Helpers
 

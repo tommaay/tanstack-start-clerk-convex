@@ -1,6 +1,6 @@
 # Not found and error boundary
 
-Unknown URLs render the app shell with a `404` heading, `We couldn’t find that page.`, and a `Go home` button (HTTP 404). A route that throws renders the catch boundary: heading `Something went wrong`, `Please try again. If the problem continues, go back home.`, a `Try again` button that re-runs the route, and a `Go home` link; in development the raw error is shown below the message (`src/components/error-boundary.tsx`). The dev-only route `/e2e/error` throws `e2e: intentional route error` on purpose so the boundary can be exercised; production builds answer 404 for it.
+Unknown URLs render the app shell with a `404` heading, `We couldn’t find that page.`, and a `Go home` link styled as a button (`role=link`; HTTP 404). A route that throws renders the catch boundary: heading `Something went wrong`, `Please try again. If the problem continues, go back home.`, a `Try again` button that re-runs the route, and a `Go home` link; in development the raw error is shown below the message (`src/components/error-boundary.tsx`). The dev-only route `/e2e/error` throws `e2e: intentional route error` on purpose so the boundary can be exercised; production builds answer 404 for it.
 
 ## Sub-features
 
@@ -49,7 +49,7 @@ node .cursor/skills/verify-starter/bin/drive.mjs --feature not-found-and-errors 
 ## Gotchas
 
 - The apostrophe in `We couldn’t find that page.` is the typographic `’` (U+2019), copied from `src/components/not-found.tsx`; a straight `'` does not match.
-- `/e2e/error` exists only under `vite dev` (`import.meta.env.DEV`). Against `pnpm build && pnpm start` it is a 404, and the raw error detail is hidden in production too.
+- `/e2e/error` is registered in every build (`src/routeTree.gen.ts`), but its `beforeLoad` throws `notFound()` unless `import.meta.env.DEV`. Against `pnpm build && pnpm start` it is therefore a 404, and the raw error detail is hidden in production too.
 - `Go home` appears twice in the boundary's DOM tree only if a nested boundary also renders; on `/e2e/error` there is one, so `role=link name="Go home"` is unambiguous.
 - The boundary logs `DefaultCatchBoundary Error:` to the browser console on purpose; the `console.log` artifact will contain it. It is not a new failure.
 - Signed-in users see the same pages; the shell (nav, avatar) is unaffected by the 404 or the boundary.

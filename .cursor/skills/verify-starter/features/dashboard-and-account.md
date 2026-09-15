@@ -1,6 +1,6 @@
 # Dashboard and Account
 
-Signed-in pages. `/dashboard` shows three cards: `Clerk session` (name, email, user ID read from Clerk on the client), `Convex identity` (email and subject returned by the Convex query `user:profile`, which reads the verified Clerk JWT; it shows `No identity on the Convex request.` when the JWT does not reach Convex), and `Components` with a `Show a toast` button that raises the sonner toast `Hello from sonner 👋`. `/user` shows one `Account` card: `Welcome! Your email address is <email>.` or `You are not logged in.` Both are reachable from the avatar menu (`Dashboard`, `Account`) and the home `Go to dashboard` link.
+Signed-in pages. `/dashboard` shows three cards: `Clerk session` (name, email, user ID read from Clerk on the client), `Convex identity` (email and subject returned by the Convex query `user:profile`, which reads the verified Clerk JWT; it shows `No identity on the Convex request.` when the JWT does not reach Convex), and `Components` with a `Show a toast` button that raises the sonner toast `Hello from sonner 👋`. `/user` shows one `Account` card: `Welcome! Your email address is <email>.` or `You are not logged in.` Both are reachable from the avatar menu (`Dashboard`, `Account`); `/dashboard` also from the home `Go to dashboard` link and the `Dashboard` nav link.
 
 ## Sub-features
 
