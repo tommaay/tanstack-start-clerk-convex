@@ -12,9 +12,11 @@ pre-commit:
       glob: "**/*.{js,ts,cjs,mjs,d.cts,d.mts,jsx,tsx,json,jsonc,css}"
       run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true {staged_files}
       stage_fixed: true
-    eslint-convex:
-      glob: "convex/**/*.{js,ts}"
-      run: pnpm exec eslint convex
+    eslint:
+      glob:
+        - "convex/**/*.{js,ts}"
+        - "src/**/*.{js,ts,tsx,jsx}"
+      run: pnpm exec eslint convex src
     hard-rails:
       glob:
         - "src/**/*.{js,ts,tsx,jsx,mjs}"

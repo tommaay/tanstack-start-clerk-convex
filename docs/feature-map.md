@@ -41,7 +41,7 @@ via `fetchClerkAuth` server function). Error fallback:
 
 | Tier | Command | Covers |
 | --- | --- | --- |
-| Static | `pnpm lint`, `pnpm typecheck` | Biome, ESLint (convex), validators, rails, TS |
+| Static | `pnpm lint`, `pnpm typecheck` | Biome, ESLint (convex + `@shadcn/lint` on `src/`), validators, rails, TS |
 | Unit | `pnpm test` | Convex functions, repo scripts |
 | Drift | `pnpm convex:check` | `convex/_generated/` matches HEAD |
 | Browser | `pnpm test:e2e` | SSR pages, Convex data, Clerk gate; signed-in with `E2E_CLERK_USER_EMAIL` |

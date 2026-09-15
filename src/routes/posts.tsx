@@ -5,7 +5,7 @@ import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { api } from 'convex/_generated/api';
 import { useAction } from 'convex/react';
 import { toast } from 'sonner';
-import { H1 } from '~/components/typography';
+import { H1, Muted } from '~/components/typography';
 import { Button } from '~/components/ui/button';
 import {
   Card,
@@ -57,8 +57,10 @@ function PostsComponent() {
 
       {posts.length === 0 ? (
         <Card>
-          <CardContent className="text-muted-foreground">
-            No posts yet. Use “Populate posts” to seed some from Convex.
+          <CardContent>
+            <Muted>
+              No posts yet. Use “Populate posts” to seed some from Convex.
+            </Muted>
           </CardContent>
         </Card>
       ) : (

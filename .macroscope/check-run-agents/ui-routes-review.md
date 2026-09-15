@@ -74,7 +74,7 @@ The Correctness check already finds runtime bugs. Do not repeat it. Focus on the
 
 ## Do not flag
 
-- Anything `pnpm lint` catches: `console.*`, missing `import type`, unused imports and variables, server-only imports from `src/components/**` or `src/lib/**`, the literal `do not ... because` comment form.
+- Anything `pnpm lint` catches: `console.*`, missing `import type`, unused imports and variables, server-only imports from `src/components/**` or `src/lib/**`, the literal `do not ... because` comment form, `@shadcn/lint` restyles / raw colors / arbitrary values / inline styles on UI components.
 - Formatting. Biome owns it.
 - `src/routes/e2e/error.tsx`. It throws on purpose and answers 404 in production.
 - Clerk `<SignIn routing="hash">` in `_authed.tsx`. Hash routing is intentional so the gate works on any protected URL without a sign-in route.

@@ -2,6 +2,7 @@ import { useClerk, useUser } from '@clerk/tanstack-react-start';
 import { Link } from '@tanstack/react-router';
 import { LayoutDashboard, LogOut, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
+import { Button } from '~/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,11 +28,13 @@ export function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-        <Avatar className="size-9">
-          <AvatarImage src={user.imageUrl} alt={user.fullName ?? 'User'} />
-          <AvatarFallback>{initials}</AvatarFallback>
-        </Avatar>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <Avatar>
+            <AvatarImage src={user.imageUrl} alt={user.fullName ?? 'User'} />
+            <AvatarFallback>{initials}</AvatarFallback>
+          </Avatar>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="flex flex-col gap-0.5">

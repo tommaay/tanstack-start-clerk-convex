@@ -30,7 +30,7 @@ pnpm dev   # runs the app on :3000 + convex dev
 | `pnpm dev` | `convex dev --once`, then Vite (:3000) + `convex dev` watcher |
 | `pnpm check` | Full gate: format → lint → typecheck → test → convex:check → e2e |
 | `pnpm check:core` | Same without Playwright |
-| `pnpm lint` / `pnpm lint:fix` | Biome (`src/`, `scripts/`), ESLint (`convex/`), returns-validator and hard-rail scans |
+| `pnpm lint` / `pnpm lint:fix` | Biome (`src/`, `scripts/`), ESLint (`convex/` + `src/` `@shadcn/lint`), returns-validator and hard-rail scans |
 | `pnpm format` / `pnpm format:check` | Biome formatter |
 | `pnpm test` | Vitest — `convex-test` specs in `convex/`, script tests in `scripts/` |
 | `pnpm test:e2e` | Playwright against `vite dev` (needs Clerk dev keys in `.env.local`) |
@@ -39,7 +39,7 @@ pnpm dev   # runs the app on :3000 + convex dev
 | `pnpm build` / `pnpm start` | Nitro production build to `.output/` and local run |
 
 Lefthook installs a pre-commit hook on `pnpm install` (Biome on staged files,
-ESLint on `convex/`, rail scans, agent-doc sync).
+ESLint on `convex/` and `src/`, rail scans, agent-doc sync).
 
 ## Testing
 

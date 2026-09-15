@@ -45,7 +45,7 @@ The author names a question, a flow, or a file set ("does the profile query hand
 ## Rules for all modes
 
 - **Never invent TanStack Start, TanStack Router, Clerk, Convex, or shadcn/ui APIs.** Verify unknown APIs in the official docs linked from the `## Docs index` of `AGENTS.md`, Convex APIs in `convex/_generated/ai/guidelines.md`, and anything else in `node_modules` types. If you can't verify, report "could not verify `<thing>`" — don't guess.
-- Don't flag what `pnpm lint`, `pnpm typecheck`, or the tests already catch (Biome formatting, `import type`, `console.*`, banned server-only imports from `src/components/**` and `src/lib/**`, missing Convex `returns`). The checklists list their own exclusions — honor them.
+- Don't flag what `pnpm lint`, `pnpm typecheck`, or the tests already catch (Biome formatting, `import type`, `console.*`, banned server-only imports from `src/components/**` and `src/lib/**`, missing Convex `returns`, `@shadcn/lint` restyles). The checklists list their own exclusions — honor them.
 - Findings need file:line, the rule, what's wrong, and the fix — under ~40 words each. No file:line, no finding.
 - If the code is clean, say so plainly. A review that invents findings is worse than no review.
 

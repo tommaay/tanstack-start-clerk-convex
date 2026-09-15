@@ -9,19 +9,20 @@ Full-stack React starter: **TanStack Start** (SSR, file routes, Vite 8) + **Cler
 - `pnpm dev` — `convex dev --once`, then Vite (port 3000) + `convex dev` watcher together
 - `pnpm check` — **must pass** after any agent change (format → lint → typecheck → test → convex:check → e2e). `pnpm check:core` is the same without e2e
 - `pnpm typecheck` — `tsc --noEmit`
-- `pnpm lint` / `pnpm lint:fix` — Biome on the repo, ESLint on `convex/` only, `scripts/check-convex-returns.mjs`, `scripts/check-hard-rails.mjs`
+- `pnpm lint` / `pnpm lint:fix` — Biome on the repo, ESLint on `convex/` (Convex plugin) and `src/` (`@shadcn/lint`), `scripts/check-convex-returns.mjs`, `scripts/check-hard-rails.mjs`
 - `pnpm format` / `pnpm format:check` — Biome formatter (not Prettier)
 - `pnpm test` — Vitest: `convex/**/*.test.ts` (convex-test, edge-runtime) and `scripts/**/*.test.mjs` (node)
 - `pnpm test:e2e` — Playwright against `vite dev` with real Clerk **dev** keys from `.env.local`. Signed-in specs need `E2E_CLERK_USER_EMAIL`. If :3000 is busy, `E2E_PORT=3123 pnpm test:e2e`
 - `pnpm convex:generate` — `convex dev --once`; commit `convex/_generated/` after Convex modules change (`pnpm convex:check` fails when it differs from HEAD). CI and cloud agents run it with `CONVEX_AGENT_MODE=anonymous`
 - `pnpm agents:sync` — regenerate `AGENTS.md` / `CLAUDE.md` from `INSTRUCTIONS.md`
 - `pnpm build` / `pnpm start` — Nitro production build to `.output/` and local run
-- Pre-commit (Lefthook): Biome on staged files, ESLint on `convex/`, rails, agent-doc sync. Not `pnpm check`. CI still must pass
+- Pre-commit (Lefthook): Biome on staged files, ESLint on `convex/` and `src/`, rails, agent-doc sync. Not `pnpm check`. CI still must pass
 
 ## Conventions
 
 - pnpm (not npm/yarn)
-- Biome formats the repo and lints `src/` + `scripts/`. ESLint lints `convex/` only. Do not add Prettier
+- Biome formats the repo and lints general rules in `src/` + `scripts/`. ESLint lints `convex/` (`@convex-dev/eslint-plugin`) and `src/` (`@shadcn/lint`). Do not add Prettier
+- `className` on UI components is for layout only (`w-full`, margin, flex placement). Change appearance with `variant` / `size`, not padding, color, or shape classes. `@shadcn/lint` (`shadcn/no-restyle`) enforces this
 - `import type` for type-only imports (`useImportType` is an error). After `pnpm dlx shadcn@latest add <name>`, run `pnpm lint:fix`
 - Functions with 2+ args: object param in, object out
 - JSDoc on all files — top-level file doc + each exported function
@@ -63,7 +64,7 @@ Rules: [docs/cloud-agents.md](docs/cloud-agents.md).
 - `docs/feature-map.md` — route → files → tests map; how to add a page
 - `docs/cloud-agents.md` — cloud agent setup, secrets, Convex isolation
 - `convex/_generated/ai/guidelines.md` — Convex API rules (generated, read-only)
-- Official: [TanStack Start](https://tanstack.com/start/latest), [Clerk + TanStack](https://clerk.com/docs/tanstack-react-start/getting-started/quickstart), [Convex + Clerk](https://docs.convex.dev/auth/clerk), [Hosting (Vercel/Nitro)](https://tanstack.com/start/latest/docs/framework/react/guide/hosting)
+- Official: [TanStack Start](https://tanstack.com/start/latest), [Clerk + TanStack](https://clerk.com/docs/tanstack-react-start/getting-started/quickstart), [Convex + Clerk](https://docs.convex.dev/auth/clerk), [Hosting (Vercel/Nitro)](https://tanstack.com/start/latest/docs/framework/react/guide/hosting), [shadcn/lint](https://github.com/shadcn-ui/lint)
 
 ## Gotchas
 
