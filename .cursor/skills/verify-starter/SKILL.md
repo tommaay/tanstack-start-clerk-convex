@@ -106,6 +106,7 @@ Backend side of a proof:
 .cursor/skills/verify-starter/bin/backend.sh posts-count   # read-only
 .cursor/skills/verify-starter/bin/backend.sh posts-list    # read-only JSON
 .cursor/skills/verify-starter/bin/backend.sh posts-reset   # fixture reset (empty import --replace)
+.cursor/skills/verify-starter/bin/backend.sh posts-populate # seed outside the UI (fixture for `posts-live`, not proof of the button)
 .cursor/skills/verify-starter/bin/backend.sh env-list      # deployment env (CLERK_JWT_ISSUER_DOMAIN)
 ```
 
@@ -142,7 +143,7 @@ Fixture residue is separate from instances: if a drive populated posts, `bin/bac
 | `bin/launch.sh` | `.cursor/skills/verify-starter/bin/launch.sh [--port N] [--run-id ID]` | Start Convex (anonymous) + Vite, wait for ready, write `state.env` |
 | `bin/doctor.sh` | `.cursor/skills/verify-starter/bin/doctor.sh` | Read-only health check of the recorded run |
 | `bin/drive.mjs` | `node .cursor/skills/verify-starter/bin/drive.mjs --feature <id> [--base URL] [--continue] [--clerk-testing-token] [--sign-in EMAIL] <step>...` | Playwright step runner with per-step evidence |
-| `bin/backend.sh` | `.cursor/skills/verify-starter/bin/backend.sh posts-list\|posts-count\|posts-reset\|env-list` | Convex state read / fixture reset via the Convex CLI |
+| `bin/backend.sh` | `.cursor/skills/verify-starter/bin/backend.sh posts-list\|posts-count\|posts-reset\|posts-populate\|env-list` | Convex state read / fixture reset and seed via the Convex CLI |
 | `bin/cleanup.sh` | `.cursor/skills/verify-starter/bin/cleanup.sh` | Tear down what launch started; keep evidence |
 | `bin/lib.sh` | sourced by the scripts | Shared paths, mode detection, port/PID helpers |
 
