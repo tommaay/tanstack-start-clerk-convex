@@ -25,7 +25,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --port) PORT="$2"; shift 2 ;;
     --run-id) RUN_ID="$2"; shift 2 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
 done
@@ -42,7 +42,8 @@ mkdir -p "$RUN_DIR" "$ARTIFACTS_ROOT/$RUN_ID"
 
 # Playwright's Chromium is required by bin/drive.mjs. Install the browser
 # cache when missing; system libraries may still need
-# `sudo node node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/cli.js install-deps chromium`.
+# `sudo "$(command -v node)" node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/cli.js install-deps chromium`
+# (root's PATH often has no `node`, so plain `sudo node` fails).
 if [ -z "$(chromium_path)" ]; then
   log "Playwright Chromium missing; running: pnpm exec playwright install chromium"
   pnpm exec playwright install chromium

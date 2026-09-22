@@ -34,7 +34,7 @@ The generating run was `keyless` + `anonymous` (Cursor Cloud Agent without Clerk
 .cursor/skills/verify-starter/bin/launch.sh --port 3123
 ```
 
-Does, in order: checks `node_modules` and `.env.local` (`VITE_CONVEX_URL`); installs Playwright Chromium into `~/.cache/ms-playwright` if missing (system libraries: `sudo node node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/cli.js install-deps chromium`); starts `CONVEX_AGENT_MODE=anonymous pnpm exec convex dev` (anonymous mode, unless :3210 already serves the deployment named in `.env.local`) and waits for `GET http://127.0.0.1:3210/version` plus the log line `Convex functions ready`; starts `pnpm dev:web --port <port> --strictPort`; waits for `GET /` to answer.
+Does, in order: checks `node_modules` and `.env.local` (`VITE_CONVEX_URL`); installs Playwright Chromium into `~/.cache/ms-playwright` if missing (system libraries are not installed by the launcher: run `sudo "$(command -v node)" node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/cli.js install-deps chromium` first on a fresh machine; `sudo node …` fails with `sudo: node: command not found` when root's `PATH` has no Node, as in the Cursor Cloud environment); starts `CONVEX_AGENT_MODE=anonymous pnpm exec convex dev` (anonymous mode, unless :3210 already serves the deployment named in `.env.local`) and waits for `GET http://127.0.0.1:3210/version` plus the log line `Convex functions ready`; starts `pnpm dev:web --port <port> --strictPort`; waits for `GET /` to answer.
 
 Ready signal: `GET http://localhost:<port>/` returns **200** and the body contains the nav brand `Start · Clerk · Convex`. The launcher prints `ready: http://localhost:<port> (run <id>, clerk=<mode>, convex=<mode>)`.
 

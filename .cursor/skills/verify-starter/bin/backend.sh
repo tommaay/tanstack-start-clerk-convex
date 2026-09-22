@@ -37,7 +37,7 @@ case "$cmd" in
     convex_cli env list
     ;;
   ""|-h|--help)
-    sed -n '2,17p' "$0"
+    sed -n '2,16p' "$0"
     ;;
   *)
     die "unknown command: $cmd"
