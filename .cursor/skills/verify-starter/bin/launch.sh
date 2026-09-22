@@ -42,7 +42,8 @@ mkdir -p "$RUN_DIR" "$ARTIFACTS_ROOT/$RUN_ID"
 
 # Playwright's Chromium is required by bin/drive.mjs. Install the browser
 # cache when missing; system libraries may still need
-# `sudo node node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/cli.js install-deps chromium`.
+# `sudo "$(command -v node)" node_modules/.pnpm/playwright-core@*/node_modules/playwright-core/cli.js install-deps chromium`
+# (root's PATH often has no `node`, so plain `sudo node` fails).
 if [ -z "$(chromium_path)" ]; then
   log "Playwright Chromium missing; running: pnpm exec playwright install chromium"
   pnpm exec playwright install chromium
