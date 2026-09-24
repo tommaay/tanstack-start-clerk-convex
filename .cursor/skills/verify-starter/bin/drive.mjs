@@ -261,7 +261,12 @@ async function main() {
   const { flags, steps } = parseArgs({ argv: process.argv.slice(2) });
   if (flags.help || !flags.feature || steps.length === 0) {
     const doc = readFileSync(fileURLToPath(import.meta.url), 'utf8');
-    out(doc.slice(0, doc.indexOf('*/')).replaceAll(/^\/?\*+ ?/gm, ''));
+    out(
+      doc
+        .slice(0, doc.indexOf('*/'))
+        .replaceAll(/^\s*\/?\*+ ?/gm, '')
+        .trim(),
+    );
     process.exit(flags.help ? 0 : 2);
   }
 
